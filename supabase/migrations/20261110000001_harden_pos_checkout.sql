@@ -1,0 +1,2 @@
+-- Superseded by 20261110000003_guard_pos_checkout.sql.
+-- The active cashier guard is kept in that migration.

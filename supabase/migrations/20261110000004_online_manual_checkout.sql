@@ -1,0 +1,2 @@
+-- Superseded by 20261110000006_online_checkout_and_admin.sql.
+-- Run the complete online checkout and admin workflow from that migration.
