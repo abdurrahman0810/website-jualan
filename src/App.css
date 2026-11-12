@@ -140,7 +140,7 @@
 }
 .hero-description {
   font:
-    14px/1.8 Inter,
+    14px/1.8 var(--font-inter),
     sans-serif;
   max-width: 315px;
   color: #fff8f1;
@@ -256,7 +256,7 @@
 }
 .collection-intro > p {
   font:
-    12px Inter,
+    12px var(--font-inter),
     sans-serif;
   color: var(--muted);
 }
@@ -353,7 +353,7 @@
 }
 .product-meta p {
   font:
-    11px Inter,
+    11px var(--font-inter),
     sans-serif;
   color: var(--muted);
   margin: 0;
@@ -446,7 +446,7 @@
 }
 .story-copy > p:not(.eyebrow) {
   font:
-    13px/1.9 Inter,
+    13px/1.9 var(--font-inter),
     sans-serif;
   color: #6b5d59;
   max-width: 360px;
@@ -495,7 +495,7 @@
 }
 .promise-row p {
   font:
-    11px/1.65 Inter,
+    11px/1.65 var(--font-inter),
     sans-serif;
   color: var(--muted);
   margin: 0;
@@ -516,7 +516,7 @@
 }
 .newsletter > p:not(.eyebrow) {
   font:
-    12px Inter,
+    12px var(--font-inter),
     sans-serif;
   color: var(--muted);
 }
@@ -542,7 +542,7 @@
   background: transparent;
   padding: 13px 3px;
   font:
-    12px Inter,
+    12px var(--font-inter),
     sans-serif;
   color: var(--ink);
 }
@@ -569,7 +569,7 @@
 }
 .site-footer > div:first-child p {
   font:
-    10px Inter,
+    10px var(--font-inter),
     sans-serif;
   color: var(--muted);
   margin: 7px 0 0;
@@ -583,7 +583,7 @@
 .copyright {
   justify-self: end;
   font:
-    9px Inter,
+    9px var(--font-inter),
     sans-serif;
   color: var(--muted);
 }
@@ -688,7 +688,7 @@
 .cart-item p,
 .cart-item b {
   font:
-    11px Inter,
+    11px var(--font-inter),
     sans-serif;
   margin: 0 0 8px;
   display: block;
@@ -716,7 +716,7 @@
 }
 .cart-summary > p {
   font:
-    10px Inter,
+    10px var(--font-inter),
     sans-serif;
   color: var(--muted);
   margin: 8px 0;
@@ -1085,7 +1085,7 @@
 }
 .account-popover > span {
   font:
-    10px Inter,
+    10px var(--font-inter),
     sans-serif;
   color: var(--muted);
 }
@@ -1096,7 +1096,7 @@
   background: var(--pink);
   color: var(--plum);
   font:
-    700 8px "Plus Jakarta Sans",
+    700 8px var(--font-plus-jakarta),
     sans-serif;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1117,7 +1117,7 @@
   background: #fff0d2;
   color: #695947;
   font:
-    10px Inter,
+    10px var(--font-inter),
     sans-serif;
 }
 .catalog-message.error {
@@ -1133,7 +1133,7 @@
   color: #80626a;
   text-align: center;
   font:
-    700 10px/1.6 "Plus Jakarta Sans",
+    700 10px/1.6 var(--font-plus-jakarta),
     sans-serif;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1164,7 +1164,7 @@
 }
 .checkout-intro {
   font:
-    11px/1.6 Inter,
+    11px/1.6 var(--font-inter),
     sans-serif;
   color: var(--muted);
   margin: 12px 0 17px;
@@ -1185,7 +1185,7 @@
   display: inline;
   color: var(--muted);
   font:
-    10px Inter,
+    10px var(--font-inter),
     sans-serif;
 }
 .checkout-form input,
@@ -1197,7 +1197,7 @@
   padding: 10px 11px;
   color: var(--ink);
   font:
-    11px Inter,
+    11px var(--font-inter),
     sans-serif;
   outline: none;
   border-radius: 0;
@@ -1227,7 +1227,7 @@
   margin: 0;
   color: var(--muted);
   font:
-    10px/1.6 Inter,
+    10px/1.6 var(--font-inter),
     sans-serif;
 }
 .checkout-submit {
@@ -1282,7 +1282,7 @@
 .admin-dashboard-intro p:last-child {
   margin: 0;
   color: var(--muted);
-  font: 12px/1.7 Inter, sans-serif;
+  font: 12px/1.7 var(--font-inter), sans-serif;
 }
 .admin-back-link {
   display: inline-flex;
@@ -1311,7 +1311,7 @@
   place-items: center;
   background: #f7eee9;
   color: var(--plum);
-  font: 13px Inter, sans-serif;
+  font: 13px var(--font-inter), sans-serif;
 }
 .cashier-monitor {
   max-width: 1320px;
@@ -1336,7 +1336,7 @@
 .cashier-monitor-empty p {
   margin: 0;
   color: var(--muted);
-  font: 11px/1.6 Inter, sans-serif;
+  font: 11px/1.6 var(--font-inter), sans-serif;
 }
 .cashier-monitor-heading > button {
   flex: 0 0 auto;
@@ -1399,7 +1399,7 @@
 .cashier-session-card > p {
   margin: 0;
   color: var(--muted);
-  font: 10px Inter, sans-serif;
+  font: 10px var(--font-inter), sans-serif;
 }
 .cashier-session-footer {
   display: flex;
@@ -1415,7 +1415,7 @@
   margin: 12px 0 0;
   color: #9a8585;
   text-align: right;
-  font: 9px Inter, sans-serif;
+  font: 9px var(--font-inter), sans-serif;
 }
 .cashier-monitor-error {
   margin: 18px 0 0;
@@ -1423,7 +1423,7 @@
   background: #ffe5e2;
   padding: 13px;
   color: #8c493d;
-  font: 10px/1.6 Inter, sans-serif;
+  font: 10px/1.6 var(--font-inter), sans-serif;
 }
 .customer-account-page {
   min-height: 100vh;
@@ -1464,7 +1464,7 @@
 .customer-list-heading p {
   margin: 0;
   color: var(--muted);
-  font: 12px/1.7 Inter, sans-serif;
+  font: 12px/1.7 var(--font-inter), sans-serif;
 }
 .customer-account-tabs {
   display: flex;
@@ -1507,7 +1507,7 @@
   padding: 22px;
   color: #846f72;
   text-align: center;
-  font: 11px Inter, sans-serif;
+  font: 11px var(--font-inter), sans-serif;
 }
 .customer-account-message {
   max-width: 1180px;
@@ -1516,7 +1516,7 @@
   background: #fff0d2;
   padding: 10px 13px;
   color: #695947;
-  font: 10px/1.5 Inter, sans-serif;
+  font: 10px/1.5 var(--font-inter), sans-serif;
 }
 .customer-form {
   display: grid;
@@ -1526,7 +1526,7 @@
 .customer-form > p {
   margin: -4px 0 2px;
   color: var(--muted);
-  font: 11px Inter, sans-serif;
+  font: 11px var(--font-inter), sans-serif;
 }
 .customer-form label {
   display: grid;
@@ -1546,7 +1546,7 @@
   background: #fffdfa;
   padding: 9px 11px;
   color: var(--plum);
-  font: 11px Inter, sans-serif;
+  font: 11px var(--font-inter), sans-serif;
 }
 .customer-form input:read-only {
   color: #907d80;
@@ -1627,7 +1627,7 @@
 .customer-wishlist-card p,
 .customer-restock-card p {
   color: var(--muted);
-  font: 10px/1.7 Inter, sans-serif;
+  font: 10px/1.7 var(--font-inter), sans-serif;
 }
 .customer-address-card > footer {
   justify-content: flex-start;
@@ -1655,7 +1655,7 @@
 }
 .customer-order-card > header time {
   color: var(--muted);
-  font: 9px Inter, sans-serif;
+  font: 9px var(--font-inter), sans-serif;
 }
 .customer-order-card ul {
   display: grid;
@@ -1777,7 +1777,7 @@
 .auth-intro {
   margin: 0 0 20px;
   color: var(--muted);
-  font: 12px/1.7 Inter, sans-serif;
+  font: 12px/1.7 var(--font-inter), sans-serif;
 }
 .auth-close {
   position: absolute;
@@ -1789,7 +1789,7 @@
   padding: 10px 12px;
   background: #ffe5e2;
   color: #8c493d;
-  font: 11px/1.5 Inter, sans-serif;
+  font: 11px/1.5 var(--font-inter), sans-serif;
 }
 .admin-panel {
   width: min(1120px, 100%);
@@ -1814,7 +1814,7 @@
 .admin-panel-header > div > p:last-child,
 .admin-account-card > div p {
   font:
-    11px/1.65 Inter,
+    11px/1.65 var(--font-inter),
     sans-serif;
   color: var(--muted);
   margin: 0;
@@ -1854,7 +1854,7 @@
   background: #fffdfa;
   padding: 8px 10px;
   font:
-    11px Inter,
+    11px var(--font-inter),
     sans-serif;
   color: var(--ink);
   outline: none;
@@ -1893,7 +1893,7 @@
   border-radius: 8px;
   background: #fffdfa;
   padding: 8px 10px;
-  font: 11px Inter, sans-serif;
+  font: 11px var(--font-inter), sans-serif;
   color: var(--ink);
   outline: none;
 }
@@ -1922,7 +1922,7 @@
 .admin-list-heading span,
 .admin-refresh {
   font:
-    10px Inter,
+    10px var(--font-inter),
     sans-serif;
   color: var(--muted);
 }
@@ -1939,7 +1939,7 @@
   background: #fff0d2;
   color: #695947;
   font:
-    11px/1.6 Inter,
+    11px/1.6 var(--font-inter),
     sans-serif;
 }
 .admin-order-list {
@@ -1970,7 +1970,7 @@
 }
 .admin-order-top time {
   font:
-    9px Inter,
+    9px var(--font-inter),
     sans-serif;
   color: var(--muted);
 }
@@ -1979,7 +1979,7 @@
   background: #fff0d2;
   color: #755326;
   font:
-    700 8px "Plus Jakarta Sans",
+    700 8px var(--font-plus-jakarta),
     sans-serif;
 }
 .status-diproses {
@@ -2010,7 +2010,7 @@
 }
 .admin-order-columns p {
   font:
-    10px/1.65 Inter,
+    10px/1.65 var(--font-inter),
     sans-serif;
   color: var(--muted);
   margin: 3px 0;
@@ -2031,7 +2031,7 @@
   justify-content: space-between;
   gap: 12px;
   font:
-    10px/1.5 Inter,
+    10px/1.5 var(--font-inter),
     sans-serif;
 }
 .admin-order-items li b {
@@ -2044,7 +2044,7 @@
   border-top: 1px solid var(--line);
   padding: 12px 0;
   font:
-    10px Inter,
+    10px var(--font-inter),
     sans-serif;
   color: var(--muted);
 }
@@ -2052,7 +2052,7 @@
   margin-left: auto;
   color: var(--ink);
   font:
-    700 12px "Plus Jakarta Sans",
+    700 12px var(--font-plus-jakarta),
     sans-serif;
 }
 .admin-order-actions {
@@ -2072,7 +2072,7 @@
   color: white;
   padding: 8px 11px;
   font:
-    700 9px "Plus Jakarta Sans",
+    700 9px var(--font-plus-jakarta),
     sans-serif;
   cursor: pointer;
 }
@@ -2095,7 +2095,7 @@
 }
 .shipment-fields > span {
   font:
-    10px Inter,
+    10px var(--font-inter),
     sans-serif;
   color: var(--muted);
   margin-right: auto;

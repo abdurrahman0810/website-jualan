@@ -16,20 +16,22 @@ export type Product = {
   measurements: Record<string, string>
   variants: Variant[]
   label?: string
+  isBestSeller?: boolean
 }
 
 export type CatalogRow = {
   product_id: string
   product_name: string
   slug: string
-  description: string | null
-  material: string | null
-  measurements: Record<string, string> | null
-  category_id: string | null
-  category_name: string | null
+  description?: string | null
+  material?: string | null
+  measurements?: Record<string, string> | null
+  category_id?: string | null
+  category_name?: string | null
   sell_price: number
   image_url: string | null
   variants: Variant[] | null
+  is_best_seller?: boolean | null
 }
 
 export function mapCatalog(rows: CatalogRow[]): Product[] {
@@ -43,5 +45,6 @@ export function mapCatalog(rows: CatalogRow[]): Product[] {
     material: row.material ?? '',
     measurements: row.measurements ?? {},
     variants: row.variants ?? [],
+    isBestSeller: row.is_best_seller === true,
   }))
 }

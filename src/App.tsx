@@ -1,9 +1,15 @@
 'use client'
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import Image from 'next/image'
+import dynamic from 'next/dynamic'
 import type { User } from '@supabase/supabase-js'
 import { supabase, supabaseConfigured } from './lib/supabase'
 import { mapCatalog, type CatalogRow, type Product, type Variant } from './lib/catalog'
+import { StorefrontNavbar } from './components/StorefrontNavbar'
+
+const LoginModal = dynamic(() => import('./components/LoginModal').then((module) => module.LoginModal), { ssr: false })
+const CartDrawer = dynamic(() => import('./components/CartDrawer').then((module) => module.CartDrawer), { ssr: false })
 
 const sampleProducts: Product[] = [
   { id: 'sample-1', name: 'Pashmina Aira', category: 'Pashmina', price: 89000, imageUrl: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=760&q=85', description: 'Pashmina ringan untuk menemani hari-hari kamu.', material: 'Voal lembut', measurements: {}, label: 'Favorit', variants: [{ id: 'sample-1a', size: 'All size', color: 'Peach Bloom', available: true }, { id: 'sample-1b', size: 'All size', color: 'Butter', available: true }, { id: 'sample-1c', size: 'All size', color: 'Moss', available: true }] },
@@ -32,14 +38,21 @@ function BagIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l1 13H4L5 8Z" /><path d="M9 9V6a3 3 0 0 1 6 0v3" /></svg>
 }
 
-function App({ initialProducts, initialCatalogError }: { initialProducts: Product[] | null; initialCatalogError: string | null }) {
+type StorefrontPage = 'home' | 'shop' | 'collection' | 'about'
+
+function App({ initialProducts, initialCatalogError, page = 'home' }: { initialProducts: Product[] | null; initialCatalogError: string | null; page?: StorefrontPage }) {
   const [products, setProducts] = useState<Product[]>(initialProducts ?? (supabaseConfigured ? [] : sampleProducts))
   const catalogState: 'demo' | 'live' | 'error' = initialProducts !== null ? 'live' : initialCatalogError ? 'error' : 'demo'
   const catalogError = initialCatalogError ?? ''
+  const catalogPageSize = page === 'shop' || page === 'collection' ? 12 : 8
+  const [catalogOffset, setCatalogOffset] = useState(initialProducts?.length ?? 0)
+  const [canLoadMore, setCanLoadMore] = useState((initialProducts?.length ?? 0) >= catalogPageSize)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [category, setCategory] = useState('Semua')
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeProduct, setActiveProduct] = useState<Product | null>(null)
+  const [productDetailsLoading, setProductDetailsLoading] = useState(false)
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({})
   const [cart, setCart] = useState<{ product: Product; variant: Variant }[]>([])
   const [cartReady, setCartReady] = useState(false)
@@ -50,7 +63,6 @@ function App({ initialProducts, initialCatalogError }: { initialProducts: Produc
   const [cartOpen, setCartOpen] = useState(false)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [submittingOrder, setSubmittingOrder] = useState(false)
-  const [mobileOpen, setMobileOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
   const [loginEmail, setLoginEmail] = useState('')
@@ -63,6 +75,11 @@ function App({ initialProducts, initialCatalogError }: { initialProducts: Produc
   const [notice, setNotice] = useState('')
   const categories = useMemo(() => ['Semua', ...new Set(products.map((product) => product.category).filter(Boolean))], [products])
   const visibleProducts = useMemo(() => products.filter((product) => (category === 'Semua' || product.category === category) && (!searchTerm.trim() || `${product.name} ${product.category} ${product.description}`.toLowerCase().includes(searchTerm.toLowerCase()))), [category, products, searchTerm])
+  const bestSellerProducts = useMemo(() => {
+    const marked = visibleProducts.filter((product) => product.isBestSeller)
+    return (marked.length ? marked : visibleProducts).slice(0, 4)
+  }, [visibleProducts])
+  const hasBestSellerMarks = bestSellerProducts.some((product) => product.isBestSeller)
   const subtotal = cart.reduce((sum, item) => sum + item.product.price, 0)
   const selectedAddress = savedAddresses.find((address) => address.id === selectedAddressId)
 
@@ -145,17 +162,22 @@ function App({ initialProducts, initialCatalogError }: { initialProducts: Produc
 
   useEffect(() => {
     const client = supabase
-    if (!client || initialProducts === null) return undefined
+    if (!client || initialProducts !== null || page === 'about') return undefined
 
     let current = true
-    void client.rpc('daftar_produk_online').then(({ data, error }) => {
+    void client.rpc('daftar_produk_online')
+      .select('product_id,product_name,slug,category_name,sell_price,image_url,variants')
+      .range(0, catalogPageSize - 1).then(({ data, error }) => {
       if (!current) return
       if (error) return
-      setProducts(mapCatalog((data ?? []) as CatalogRow[]))
+      const next = mapCatalog((data ?? []) as CatalogRow[])
+      setProducts(next)
+      setCatalogOffset(next.length)
+      setCanLoadMore(next.length === catalogPageSize)
     })
 
     return () => { current = false }
-  }, [initialProducts])
+  }, [catalogPageSize, initialProducts, page])
 
   useEffect(() => {
     const client = supabase
@@ -248,6 +270,37 @@ function App({ initialProducts, initialCatalogError }: { initialProducts: Produc
   function selectedVariant(product: Product) {
     const selectedId = selectedVariants[product.id]
     return product.variants.find((variant) => variant.id === selectedId) ?? product.variants.find((variant) => variant.available) ?? product.variants[0]
+  }
+
+  async function openProduct(product: Product) {
+    setActiveProduct(product)
+    if (!supabase || product.id.startsWith('sample-') || (product.description && product.material)) return
+    setProductDetailsLoading(true)
+    const { data, error } = await supabase.rpc('daftar_produk_online')
+      .select('product_id,product_name,slug,description,material,measurements,category_id,category_name,sell_price,image_url,variants')
+      .eq('product_id', product.id).maybeSingle()
+    if (error) showNotice(`Detail produk belum bisa dimuat: ${error.message}`)
+    else if (data) {
+      const details = mapCatalog([data as CatalogRow])[0]
+      setActiveProduct((current) => current?.id === product.id ? details : current)
+    }
+    setProductDetailsLoading(false)
+  }
+
+  async function loadMoreProducts() {
+    if (!supabase || loadingMore) return
+    setLoadingMore(true)
+    const { data, error } = await supabase.rpc('daftar_produk_online')
+      .select('product_id,product_name,slug,category_name,sell_price,image_url,variants')
+      .range(catalogOffset, catalogOffset + 11)
+    if (error) showNotice('Produk berikutnya belum bisa dimuat. Coba lagi sebentar.')
+    else {
+      const next = mapCatalog((data ?? []) as CatalogRow[])
+      setProducts((current) => [...current, ...next])
+      setCatalogOffset((current) => current + next.length)
+      setCanLoadMore(next.length === 12)
+    }
+    setLoadingMore(false)
   }
 
   function addToCart(product: Product) {
@@ -359,77 +412,63 @@ function App({ initialProducts, initialCatalogError }: { initialProducts: Produc
 
   return (
     <>
-      <header className={`site-nav${mobileOpen ? ' is-open' : ''}`}>
-        <a className="nav-wordmark" href="#top" aria-label="HEBBUNA, beranda">HEBBUNA<span>.</span></a>
-        <button className="nav-mobile-toggle" aria-label={mobileOpen ? 'Tutup navigasi' : 'Buka navigasi'} aria-expanded={mobileOpen} onClick={() => setMobileOpen(!mobileOpen)}><span /><span /></button>
-        <nav className="site-nav-links" aria-label="Navigasi utama">
-          <a className="nav-current" href="#top" onClick={() => setMobileOpen(false)}>Home</a>
-          <a href="#koleksi" onClick={() => setMobileOpen(false)}>Collections <span>⌄</span></a>
-          <a href="#produk" onClick={() => setMobileOpen(false)}>Shop <span>⌄</span></a>
-          <a href="#cerita" onClick={() => setMobileOpen(false)}>About</a>
-          <a href="#footer" onClick={() => setMobileOpen(false)}>Journal</a>
-        </nav>
-        <div className="site-nav-actions">
-          <button aria-label="Cari produk" title="Cari produk" onClick={() => { setSearchOpen(true); document.getElementById('koleksi')?.scrollIntoView({ behavior: 'smooth' }) }}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg></button>
-          <button aria-label="Buka wishlist" title="Wishlist" onClick={() => user ? window.location.assign('/akun') : openLogin()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 8.8c0 5.2-8.8 11-8.8 11s-8.8-5.8-8.8-11a4.7 4.7 0 0 1 8.8-2.2 4.7 4.7 0 0 1 8.8 2.2Z"/></svg><i>{wishlistIds.length > 0 && wishlistIds.length}</i></button>
-          <button className="nav-bag-button" aria-label={`Buka tas belanja, ${cart.length} produk`} onClick={() => setCartOpen(true)}><BagIcon /><i>{cart.length}</i></button>
-          <button className="nav-account-button" onClick={() => user ? setAccountOpen(!accountOpen) : openLogin()}>{user ? (user.user_metadata.full_name ?? user.email?.split('@')[0] ?? 'Akun') : 'Masuk'}</button>
-        </div>
-        {accountOpen && user && <div className="account-popover"><strong>{user.user_metadata.full_name ?? 'Akun pelanggan'}</strong><span>{user.email}</span><span className="role-badge">{role === 'admin' ? 'Admin' : role === 'pegawai' ? 'Pegawai' : 'Pelanggan'}</span><a href="/akun">Akun saya · pesanan · wishlist</a>{role === 'admin' && <a href="/admin">Panel admin</a>}<button onClick={() => void signOut()}>Keluar</button></div>}
-      </header>
+      <StorefrontNavbar page={page} user={user} role={role} cartCount={cart.length} wishlistCount={wishlistIds.length} accountOpen={accountOpen} onSearch={() => { if (page === 'about') { window.location.assign('/shop'); return } setSearchOpen(true); document.getElementById('koleksi')?.scrollIntoView({ behavior: 'smooth' }) }} onWishlist={() => user ? window.location.assign('/akun') : openLogin()} onCart={() => setCartOpen(true)} onLogin={() => openLogin()} onAccount={() => setAccountOpen(!accountOpen)} onSignOut={() => void signOut()} />
 
       {loginOpen && <div className="admin-overlay auth-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !loginBusy) setLoginOpen(false) }}><section className="auth-card" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="close-drawer auth-close" onClick={() => setLoginOpen(false)} aria-label="Tutup login">×</button><p className="eyebrow dark"><span>HEBBUNA STORE</span> AKUN TOKO</p><h2 id="login-title">Masuk dengan akun kasir</h2><p className="auth-intro">Pakai email dan kata sandi yang sama dengan akun Supabase di kasir.</p><form className="checkout-form" onSubmit={signInWithPassword}><label><span>Email</span><input type="email" autoComplete="username" required value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} placeholder="nama@email.com" /></label><label><span>Kata sandi</span><input type="password" autoComplete="current-password" required value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} placeholder="Kata sandi akun kasir" /></label>{loginError && <p className="auth-error" role="alert">{loginError}</p>}<button className="primary-button dark-button checkout-submit" type="submit" disabled={loginBusy}>{loginBusy ? 'Memeriksa akun…' : 'Masuk'} <span>↗</span></button></form></section></div>}
 
-      {activeProduct && <div className="product-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveProduct(null) }}><section className="product-dialog" role="dialog" aria-modal="true" aria-label={`Detail ${activeProduct.name}`}><button className="product-dialog-close" onClick={() => setActiveProduct(null)} aria-label="Tutup detail produk">×</button><div className="product-dialog-image">{activeProduct.imageUrl ? <img src={activeProduct.imageUrl} alt={activeProduct.name} /> : <div className="image-empty">{activeProduct.category}</div>}</div><div className="product-dialog-copy"><p className="eyebrow dark"><span>{activeProduct.category}</span> HEBBUNA DAILY WEAR</p>{activeProduct.label && <span className="product-dialog-label">{activeProduct.label}</span>}<h2>{activeProduct.name}</h2><p className="product-dialog-price">{money(activeProduct.price)}</p><p className="product-dialog-description">{activeProduct.description || 'Pilihan HEBBUNA yang dibuat untuk menemani hari-harimu dengan nyaman.'}</p>{activeProduct.material && <p className="product-dialog-material"><span>Bahan</span>{activeProduct.material}</p>}<div className="product-dialog-variants"><span>Pilih warna / varian</span><div>{activeProduct.variants.map((variant, index) => <button key={variant.id} className={selectedVariant(activeProduct)?.id === variant.id ? 'selected' : ''} onClick={() => setSelectedVariants((current) => ({ ...current, [activeProduct.id]: variant.id }))} disabled={!variant.available} title={variant.available ? variant.color ?? variant.size ?? 'Varian' : 'Stok habis'}><i style={{ backgroundColor: getColorHex(variant.color ?? variant.size ?? '', index) }} />{variant.color ?? variant.size ?? `Varian ${index + 1}`}{!variant.available && <small>Habis</small>}</button>)}</div></div>{Object.entries(activeProduct.measurements ?? {}).filter(([, value]) => value.trim()).length > 0 && <dl className="product-dialog-measurements">{Object.entries(activeProduct.measurements).filter(([, value]) => value.trim()).map(([key, value]) => <div key={key}><dt>{key.replaceAll('_', ' ')}</dt><dd>{value}{measurementUnit(key)}</dd></div>)}</dl>}<p className="product-dialog-stock">{selectedVariant(activeProduct)?.available ? 'Stok tersedia · siap menemani harimu' : 'Varian ini sedang habis'}</p><div className="product-dialog-actions"><button className="primary-button dark-button buy-now-button" onClick={() => buyNow(activeProduct)} disabled={!selectedVariant(activeProduct)?.available}>Beli sekarang <span>↗</span></button><button className="add-to-cart-button" onClick={() => addToCart(activeProduct)} disabled={!selectedVariant(activeProduct)?.available}><BagIcon /><span>Masukkan ke keranjang</span></button></div><button className="product-dialog-wish" onClick={() => void toggleWishlist(activeProduct)}>{wishlistIds.includes(activeProduct.id) ? '♥ Tersimpan di wishlist' : '♡ Simpan ke wishlist'}</button>{selectedVariant(activeProduct) && !selectedVariant(activeProduct)?.available && <button className="restock-request-button" onClick={() => void requestRestock(activeProduct, selectedVariant(activeProduct)!)}>{restockIds.includes(selectedVariant(activeProduct)!.id) ? '✓ Kabar restock aktif' : 'Kabari aku saat tersedia'}</button>}</div></section></div>}
+      {activeProduct && <div className="product-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveProduct(null) }}><section className="product-dialog" role="dialog" aria-modal="true" aria-label={`Detail ${activeProduct.name}`}><button className="product-dialog-close" onClick={() => setActiveProduct(null)} aria-label="Tutup detail produk">×</button><div className="product-dialog-image">{activeProduct.imageUrl ? <Image src={activeProduct.imageUrl} alt={activeProduct.name} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-cover" /> : <div className="image-empty">{activeProduct.category}</div>}</div><div className="product-dialog-copy"><p className="eyebrow dark"><span>{activeProduct.category}</span> HEBBUNA DAILY WEAR</p>{activeProduct.label && <span className="product-dialog-label">{activeProduct.label}</span>}<h2>{activeProduct.name}</h2><p className="product-dialog-price">{money(activeProduct.price)}</p>{productDetailsLoading && <p className="product-detail-loading">Mengambil detail produk…</p>}<p className="product-dialog-description">{activeProduct.description || 'Pilihan HEBBUNA yang dibuat untuk menemani hari-harimu dengan nyaman.'}</p>{activeProduct.material && <p className="product-dialog-material"><span>Bahan</span>{activeProduct.material}</p>}<div className="product-dialog-variants"><span>Pilih warna / varian</span><div>{activeProduct.variants.map((variant, index) => <button key={variant.id} className={selectedVariant(activeProduct)?.id === variant.id ? 'selected' : ''} onClick={() => setSelectedVariants((current) => ({ ...current, [activeProduct.id]: variant.id }))} disabled={!variant.available} title={variant.available ? variant.color ?? variant.size ?? 'Varian' : 'Stok habis'}><i style={{ backgroundColor: getColorHex(variant.color ?? variant.size ?? '', index) }} />{variant.color ?? variant.size ?? `Varian ${index + 1}`}{!variant.available && <small>Habis</small>}</button>)}</div></div>{Object.entries(activeProduct.measurements ?? {}).filter(([, value]) => value.trim()).length > 0 && <dl className="product-dialog-measurements">{Object.entries(activeProduct.measurements).filter(([, value]) => value.trim()).map(([key, value]) => <div key={key}><dt>{key.replaceAll('_', ' ')}</dt><dd>{value}{measurementUnit(key)}</dd></div>)}</dl>}<p className="product-dialog-stock">{selectedVariant(activeProduct)?.available ? 'Stok tersedia · siap menemani harimu' : 'Varian ini sedang habis'}</p><div className="product-dialog-actions"><button className="primary-button dark-button buy-now-button" onClick={() => buyNow(activeProduct)} disabled={!selectedVariant(activeProduct)?.available}>Beli sekarang <span>↗</span></button><button className="add-to-cart-button" onClick={() => addToCart(activeProduct)} disabled={!selectedVariant(activeProduct)?.available}><BagIcon /><span>Masukkan ke keranjang</span></button></div><button className="product-dialog-wish" onClick={() => void toggleWishlist(activeProduct)}>{wishlistIds.includes(activeProduct.id) ? '♥ Tersimpan di wishlist' : '♡ Simpan ke wishlist'}</button>{selectedVariant(activeProduct) && !selectedVariant(activeProduct)?.available && <button className="restock-request-button" onClick={() => void requestRestock(activeProduct, selectedVariant(activeProduct)!)}>{restockIds.includes(selectedVariant(activeProduct)!.id) ? '✓ Kabar restock aktif' : 'Kabari aku saat tersedia'}</button>}</div></section></div>}
 
       <main className="store-main">
-        <section className="editorial-hero" id="top">
-          <img className="editorial-hero-image" src={heroImage} alt="Koleksi hijab HEBBUNA dengan gaya modest yang anggun" />
+        {page === 'home' && <section className="editorial-hero" id="top">
+          <Image className="editorial-hero-image" src={heroImage} alt="Koleksi hijab HEBBUNA dengan gaya modest yang anggun" fill priority sizes="100vw" />
           <div className="editorial-hero-shade" />
           <div className="editorial-hero-copy"><p className="editorial-kicker"><span /> KOLEKSI TERBARU · HEBBUNA</p><h1>Anggun dalam<br /><em>kesederhanaan.</em></h1><p>Busana muslimah yang nyaman, dibuat untuk menemani hari-harimu dengan percaya diri.</p><a href="#koleksi" className="editorial-cta">Jelajahi koleksi <span>↗</span></a><div className="editorial-trust"><span className="trust-monogram">H.</span><span><strong>Nyaman jadi dirimu</strong><small>Gaya modest untuk hari yang nyata</small></span></div></div>
           <div className="editorial-hero-tag">HEBBUNA <span>·</span> DAILY MODEST WEAR</div>
           <a className="editorial-scroll" href="#koleksi"><span>Scroll untuk melihat</span><i>↓</i></a>
           <div className="editorial-note"><span>✳</span><div><strong>Dirancang untuk keseharian</strong><small>Nyaman · Anggun · Versatile</small></div><span>↗</span></div>
-        </section>
+        </section>}
 
-        <section className="collection section-wrap" id="koleksi">
-          <div className="section-heading"><div><p className="eyebrow dark"><span>01</span> KOLEKSI HEBBUNA</p><h2>Temukan gaya<br className="mobile-break" /> yang terasa <em>kamu.</em></h2></div><a href="#produk" className="underlined-link">Lihat seluruh koleksi <span>↗</span></a></div>
-          <div className="collection-intro"><p>Potongan pilihan untuk menemani hari-harimu.</p><div className="category-list" role="group" aria-label="Filter kategori produk">{categories.map((item) => <button key={item} className={category === item ? 'category-chip active' : 'category-chip'} onClick={() => setCategory(item)}>{item}</button>)}</div></div>
+        {page !== 'home' && <section className={`subpage-hero subpage-${page}`}><p className="eyebrow dark"><span>HEBBUNA STORE</span> {page === 'about' ? 'CERITA KAMI' : page === 'shop' ? 'BELANJA HEBBUNA' : 'PILIHAN KOLEKSI'}</p><h1>{page === 'about' ? <>Nyaman jadi<br /><em>dirimu sendiri.</em></> : page === 'shop' ? <>Temukan yang<br /><em>kamu suka.</em></> : <>Warna dan gaya<br /><em>untuk harimu.</em></>}</h1><p>{page === 'about' ? 'Tentang HEBBUNA dan cerita di balik modest wear yang menemani hari-hari nyata.' : page === 'shop' ? 'Jelajahi seluruh produk HEBBUNA, pilih warna favorit, dan temukan kenyamananmu.' : 'Rangkaian warna dan gaya yang kami pilih untuk menemani keseharianmu.'}</p></section>}
+
+        {(page === 'home' || page === 'shop' || page === 'collection') && <section className={`collection section-wrap page-${page}`} id="koleksi">
+          <div className="section-heading"><div><p className="eyebrow dark"><span>01</span> {page === 'home' ? hasBestSellerMarks ? 'BEST SELLER HEBBUNA' : 'PILIHAN HEBBUNA' : page === 'shop' ? 'BELANJA SEMUA PRODUK' : 'KOLEKSI HEBBUNA'}</p><h2>{page === 'home' ? <>Paling disukai,<br className="mobile-break" /> untuk <em>hari-harimu.</em></> : page === 'shop' ? <>Temukan gaya<br className="mobile-break" /> yang terasa <em>kamu.</em></> : <>Jelajahi pilihan<br className="mobile-break" /> yang <em>bercerita.</em></>}</h2></div><a href="/shop" className="underlined-link">{page === 'home' ? 'Lihat semua produk' : 'Belanja semua produk'} <span>↗</span></a></div>
+          <div className="collection-intro"><p>{page === 'home' ? hasBestSellerMarks ? 'Favorit pelanggan HEBBUNA.' : 'Pilihan produk HEBBUNA untuk memulai.' : page === 'shop' ? 'Seluruh koleksi tersedia dalam satu tempat.' : 'Pilih kategori yang paling dekat dengan gayamu.'}</p>{page !== 'home' && <div className="category-list" role="group" aria-label="Filter kategori produk">{categories.map((item) => <button key={item} className={category === item ? 'category-chip active' : 'category-chip'} onClick={() => setCategory(item)}>{item}</button>)}</div>}</div>
           {searchOpen && <label className="product-search"><span>⌕</span><input autoFocus value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Cari hijab, gamis, warna…" aria-label="Cari produk" /><button onClick={() => { setSearchOpen(false); setSearchTerm('') }} aria-label="Tutup pencarian">×</button></label>}
           {catalogState === 'error' && <p className="catalog-message error">{catalogError}</p>}
           {catalogState === 'demo' && <p className="catalog-message">Katalog contoh · sambungkan Supabase untuk memuat produk kasir.</p>}
-          <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-12 lg:grid-cols-4" id="produk">{visibleProducts.map((product, index) => {
+          <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-12 lg:grid-cols-4" id="produk">{(page === 'home' ? bestSellerProducts : visibleProducts).map((product, index) => {
             const variant = selectedVariant(product)
             const colors = [...new Map(product.variants.filter((item) => item.color).map((item) => [item.color!, item])).values()]
             return <article className="product-card-editorial" key={product.id}>
               <div className="product-media">
-                <button className="product-image-trigger" onClick={() => setActiveProduct(product)} aria-label={`Lihat detail ${product.name}`}>
+                <button className="product-image-trigger group" onClick={() => void openProduct(product)} aria-label={`Lihat detail ${product.name}`}>
                   <span className="product-index">{String(index + 1).padStart(2, '0')}</span>
-                  {product.imageUrl ? <img src={product.imageUrl} alt={product.name} loading="lazy" /> : <div className="image-empty"><span>{product.category}<br />Foto menyusul</span></div>}
+                  {product.imageUrl ? <Image src={product.imageUrl} alt={product.name} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" className="transition-transform duration-300 ease-out group-hover:scale-105" /> : <div className="image-empty"><span>{product.category}<br />Foto menyusul</span></div>}
                   <span className="product-view-hint">Lihat detail <i>↗</i></span>
                 </button>
-                {product.label && <span className="product-editorial-label">{product.label}</span>}
+                {(product.isBestSeller || product.label) && <span className="product-editorial-label">{product.isBestSeller ? 'Best seller' : product.label}</span>}
                 <button className="product-wishlist-button" onClick={() => void toggleWishlist(product)} aria-label={wishlistIds.includes(product.id) ? `Hapus ${product.name} dari wishlist` : `Simpan ${product.name} ke wishlist`} title="Wishlist">{wishlistIds.includes(product.id) ? '♥' : '♡'}</button>
                 <button className="product-quick-add" onClick={() => addToCart(product)} disabled={!variant?.available}>{variant?.available ? 'Masukkan ke tas' : 'Stok habis'} <span>{variant?.available ? '+' : '·'}</span></button>
               </div>
               <div className="product-editorial-meta"><div><h3>{product.name}</h3><p>{money(product.price)}</p></div><span>{variant?.color ?? variant?.size ?? 'Pilih varian'}</span></div>
               <div className="product-editorial-swatches" aria-label={`Warna ${product.name}`}>{colors.slice(0, 6).map((item, colorIndex) => <button key={item.id} className={variant?.id === item.id ? 'selected' : ''} style={{ backgroundColor: getColorHex(item.color ?? '', colorIndex) }} aria-label={`Pilih warna ${item.color}`} title={`${item.color}${item.available ? '' : ' · habis'}`} onClick={() => setSelectedVariants((current) => ({ ...current, [product.id]: item.id }))} />)}</div>
               {variant && !variant.available && <button className="restock-request-button" onClick={() => void requestRestock(product, variant)}>{restockIds.includes(variant.id) ? '✓ Kabar restock aktif' : '♧ Kabari aku saat tersedia'}</button>}
-              <button className="product-detail-link" onClick={() => setActiveProduct(product)}>Lihat detail produk <span>↗</span></button>
+              <button className="product-detail-link" onClick={() => void openProduct(product)}>Lihat detail produk <span>↗</span></button>
             </article>
           })}</div>
-          {catalogState === 'live' && products.length === 0 && <p className="catalog-message">Belum ada produk aktif di katalog.</p>}
-          <div className="all-products-link"><a className="primary-button dark-button" href="#produk">Jelajahi semua koleksi <span>↗</span></a></div>
-        </section>
+          {catalogState === 'live' && (page === 'home' ? bestSellerProducts.length === 0 : products.length === 0) && <p className="catalog-message">Belum ada produk aktif di katalog.</p>}
+          {(page === 'shop' || page === 'collection') && canLoadMore && <div className="all-products-link"><button className="primary-button dark-button active:scale-95 transition-transform duration-300 ease-out" onClick={() => void loadMoreProducts()} disabled={loadingMore}>{loadingMore ? 'Memuat produk…' : 'Muat produk lainnya'} <span>↓</span></button></div>}
+          {page === 'home' && <div className="all-products-link"><a className="primary-button dark-button" href="/shop">Jelajahi semua produk <span>↗</span></a></div>}
+        </section>}
 
-        <section className="story" id="cerita"><div className="story-image"><img src="https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1100&q=85" alt="Inspirasi gaya hijab yang nyaman dari HEBBUNA" loading="lazy" /><span className="story-caption">HEBBUNA · NYAMAN JADI DIRIMU</span></div><div className="story-copy"><p className="eyebrow dark"><span>02</span> CERITA HEBBUNA</p><h2>Dibuat untuk<br />hari yang <em>nyata.</em></h2><p>Kami percaya gaya yang paling indah adalah gaya yang terasa nyaman. HEBBUNA memilih warna dan bahan untuk menemani langkahmu, dari pagi yang sibuk sampai waktu pulang.</p><a href="#footer" className="underlined-link">Kenali HEBBUNA <span>↗</span></a><div className="story-doodle">H<span>.</span></div></div></section>
+        {page === 'home' && <section className="new-arrivals section-wrap" id="new-arrival"><div className="section-heading"><div><p className="eyebrow dark"><span>02</span> BARU DI HEBBUNA</p><h2>New <em>Arrival.</em></h2></div><a href="/shop" className="underlined-link">Jelajahi semua <span>↗</span></a></div><p className="new-arrivals-intro">Kenalan dengan pilihan warna dan gaya terbaru kami.</p><div className="new-arrival-grid">{products.slice(0, 8).map((product) => <article className="new-arrival-card group" key={`arrival-${product.id}`}><button className="new-arrival-image" onClick={() => void openProduct(product)} aria-label={`Lihat detail ${product.name}`}>{product.imageUrl ? <Image src={product.imageUrl} alt={product.name} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" className="transition-transform duration-300 ease-out group-hover:scale-105" /> : <span className="image-empty">{product.category}</span>}<span className="new-arrival-badge">NEW</span></button><div className="new-arrival-meta"><div><span>{product.category}</span><h3>{product.name}</h3></div><b>{money(product.price)}</b></div></article>)}</div></section>}
+
+        {page === 'about' && <><section className="story" id="cerita"><div className="story-image"><Image src="https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1100&q=85" alt="Inspirasi gaya hijab yang nyaman dari HEBBUNA" fill sizes="(max-width: 640px) 100vw, 50vw" className="object-cover" /><span className="story-caption">HEBBUNA · NYAMAN JADI DIRIMU</span></div><div className="story-copy"><p className="eyebrow dark"><span>01</span> CERITA HEBBUNA</p><h2>Dibuat untuk<br />hari yang <em>nyata.</em></h2><p>Kami percaya gaya yang paling indah adalah gaya yang terasa nyaman. HEBBUNA memilih warna dan bahan untuk menemani langkahmu, dari pagi yang sibuk sampai waktu pulang.</p><a href="/shop" className="underlined-link">Kenali koleksi kami <span>↗</span></a><div className="story-doodle">H<span>.</span></div></div></section>
 
         <section className="promise-row"><div><span className="promise-number">01</span><h3>Nyaman sepanjang hari</h3><p>Ringan dipakai dari pagi sampai sore.</p></div><div><span className="promise-number">02</span><h3>Warna mudah dipadu</h3><p>Pilihan warna yang dekat dengan gayamu.</p></div><div><span className="promise-number">03</span><h3>Dikemas oleh kami</h3><p>Pesanan disiapkan dengan teliti.</p></div></section>
 
-        <section className="newsletter"><div className="newsletter-spark">✳</div><p className="eyebrow dark"><span>03</span> SURAT DARI HEBBUNA</p><h2>Temukan warna<br />yang terasa <em>seperti rumah.</em></h2><p>Ikuti cerita, inspirasi gaya, dan kabar koleksi terbaru kami.</p><form onSubmit={(event) => { event.preventDefault(); showNotice('Makasih, kamu sudah masuk daftar kabar HEBBUNA!') }}><label className="visually-hidden" htmlFor="email">Alamat email</label><input id="email" type="email" placeholder="Alamat email kamu" required /><button type="submit">Ikuti kabar kami <span>↗</span></button></form></section>
+        <section className="newsletter"><div className="newsletter-spark">✳</div><p className="eyebrow dark"><span>03</span> SURAT DARI HEBBUNA</p><h2>Temukan warna<br />yang terasa <em>seperti rumah.</em></h2><p>Ikuti cerita, inspirasi gaya, dan kabar koleksi terbaru kami.</p><form onSubmit={(event) => { event.preventDefault(); showNotice('Makasih, kamu sudah masuk daftar kabar HEBBUNA!') }}><label className="visually-hidden" htmlFor="email">Alamat email</label><input id="email" type="email" placeholder="Alamat email kamu" required /><button type="submit">Ikuti kabar kami <span>↗</span></button></form></section></>}
       </main>
-      <footer className="site-footer" id="footer"><div className="footer-main"><div className="footer-brand"><a className="footer-wordmark" href="#top">HEBBUNA<span>.</span></a><p>Modest wear untuk menemani<br />kamu jadi diri sendiri.</p><span className="footer-manifesto">NYAMAN · ANGGUN · SEHARI-HARI</span></div><div className="footer-col"><h3>Jelajahi</h3><a href="#koleksi">Koleksi terbaru</a><a href="#produk">Semua produk</a><a href="#cerita">Cerita HEBBUNA</a></div><div className="footer-col"><h3>Untuk kamu</h3><a href="/akun">Akun & pesanan</a><a href="#footer">Bantuan berbelanja</a><a href="#footer">Kebijakan toko</a></div><div className="footer-col footer-social"><h3>Temui HEBBUNA</h3><p>Ikuti kabar koleksi dan inspirasi modest wear terbaru.</p><span>Kabar koleksi terbaru · HEBBUNA STORE</span></div></div><div className="footer-bottom"><span>© 2026 HEBBUNA STORE</span><span>Dibuat dengan rasa, untuk hari-hari nyata.</span><a href="#top">Kembali ke atas ↑</a></div></footer>
-
       <div className={cartOpen ? 'drawer-overlay open' : 'drawer-overlay'} onClick={() => { setCartOpen(false); setCheckoutOpen(false) }} />
       <aside className={cartOpen ? 'cart-drawer open' : 'cart-drawer'} aria-label="Tas belanja" aria-hidden={!cartOpen}>
         <div className="drawer-heading"><div><p className="eyebrow dark">HEBBUNA STORE</p><h2>{checkoutOpen ? 'Alamat kirim' : <>Tas belanja <span>({cart.length})</span></>}</h2></div><button className="close-drawer" onClick={() => { setCartOpen(false); setCheckoutOpen(false) }} aria-label="Tutup tas belanja">×</button></div>
@@ -449,7 +488,7 @@ function App({ initialProducts, initialCatalogError }: { initialProducts: Produc
             <p className="transfer-note">Pembayaran transfer manual. Ongkir dikonfirmasi setelah pesanan masuk, sebelum pembayaran.</p>
             <button className="primary-button dark-button checkout-submit" type="submit" disabled={submittingOrder}>{submittingOrder ? 'Menyimpan pesanan…' : 'Buat pesanan'} <span>↗</span></button>
           </form>
-        </div> : cart.length === 0 ? <div className="empty-cart"><span>♡</span><p>Tasmu masih kosong.</p><button onClick={() => setCartOpen(false)}>Yuk, cari rona favoritmu</button></div> : <><div className="cart-items">{cart.map((item, index) => <div className="cart-item" key={`${item.product.id}-${item.variant.id}-${index}`}>{item.product.imageUrl ? <img src={item.product.imageUrl} alt="" /> : <div className="cart-item-empty"/>}<div><h3>{item.product.name}</h3><p>{item.variant.color}{item.variant.size ? ` · ${item.variant.size}` : ''}</p><b>{money(item.product.price)}</b><button onClick={() => removeFromCart(index)}>Hapus</button></div></div>)}</div><div className="cart-summary"><div><span>Subtotal</span><b>{money(subtotal)}</b></div><p>Ongkir dikonfirmasi sebelum transfer manual.</p><button className="primary-button dark-button" onClick={beginCheckout}>Lanjut ke checkout <span>↗</span></button></div></>}
+        </div> : cart.length === 0 ? <div className="empty-cart"><span>♡</span><p>Tasmu masih kosong.</p><button onClick={() => setCartOpen(false)}>Yuk, cari rona favoritmu</button></div> : <><div className="cart-items">{cart.map((item, index) => <div className="cart-item" key={`${item.product.id}-${item.variant.id}-${index}`}>{item.product.imageUrl ? <Image src={item.product.imageUrl} alt="" width={60} height={72} sizes="60px" /> : <div className="cart-item-empty"/>}<div><h3>{item.product.name}</h3><p>{item.variant.color}{item.variant.size ? ` · ${item.variant.size}` : ''}</p><b>{money(item.product.price)}</b><button onClick={() => removeFromCart(index)}>Hapus</button></div></div>)}</div><div className="cart-summary"><div><span>Subtotal</span><b>{money(subtotal)}</b></div><p>Ongkir dikonfirmasi sebelum transfer manual.</p><button className="primary-button dark-button" onClick={beginCheckout}>Lanjut ke checkout <span>↗</span></button></div></>}
       </aside>
       {notice && <div className="toast" role="status">{notice}</div>}
     </>
