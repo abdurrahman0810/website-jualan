@@ -1,8 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import {
+  Banknote,
+  CheckCircle2,
+  Clock,
+  MessageCircle,
+  Package,
+  RefreshCw,
+  Truck,
+} from 'lucide-react'
 
 type AdminClient = SupabaseClient
 
@@ -61,23 +69,23 @@ type Props = {
 }
 
 const measurementFields = [
-  ['lingkar_dada', 'Lingkar dada (cm)'],
-  ['lingkar_pinggang', 'Lingkar pinggang (cm)'],
-  ['lingkar_pinggul', 'Lingkar pinggul (cm)'],
-  ['panjang_baju', 'Panjang baju (cm)'],
-  ['panjang_lengan', 'Panjang lengan (cm)'],
-  ['lebar_bahu', 'Lebar bahu (cm)'],
-  ['lebar_hijab', 'Lebar hijab (cm)'],
-  ['panjang_hijab', 'Panjang hijab (cm)'],
+  ['lingkar_dada', 'Lingkar Dada (cm)'],
+  ['lingkar_pinggang', 'Lingkar Pinggang (cm)'],
+  ['lingkar_pinggul', 'Lingkar Pinggul (cm)'],
+  ['panjang_baju', 'Panjang Baju (cm)'],
+  ['panjang_lengan', 'Panjang Lengan (cm)'],
+  ['lebar_bahu', 'Lebar Bahu (cm)'],
+  ['lebar_hijab', 'Lebar Hijab (cm)'],
+  ['panjang_hijab', 'Panjang Hijab (cm)'],
 ] as const
 
-const labelStatus: Record<string, string> = {
-  menunggu_pembayaran: 'Menunggu ongkir',
-  menunggu_transfer: 'Menunggu transfer',
-  diproses: 'Pembayaran dikonfirmasi',
-  dikirim: 'Sedang dikirim',
-  selesai: 'Selesai',
-  dibatalkan: 'Dibatalkan',
+const labelStatus: Record<string, { label: string; badge: string }> = {
+  menunggu_pembayaran: { label: 'Menunggu Ongkir', badge: 'bg-[#F5EDE2] text-[#96785D] border-[#EAE2D6]' },
+  menunggu_transfer: { label: 'Menunggu Transfer', badge: 'bg-amber-50 text-amber-800 border-amber-200' },
+  diproses: { label: 'Siap Dikemas', badge: 'bg-sky-50 text-sky-800 border-sky-200' },
+  dikirim: { label: 'Dalam Pengiriman', badge: 'bg-indigo-50 text-indigo-800 border-indigo-200' },
+  selesai: { label: 'Pesanan Selesai', badge: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+  dibatalkan: { label: 'Dibatalkan', badge: 'bg-rose-50 text-rose-700 border-rose-200' },
 }
 
 export function AdminPanel({ client, onClose, money, fullPage = false }: Props) {
@@ -97,8 +105,6 @@ export function AdminPanel({ client, onClose, money, fullPage = false }: Props) 
 
   const [loading, setLoading] = useState(true)
   const [busyTarget, setBusyTarget] = useState<string | null>(null)
-
-  // Pesan feedback dipisah per bagian agar langsung terlihat di dekat tombol yang diklik
   const [measurementMsg, setMeasurementMsg] = useState('')
   const [accountMsg, setAccountMsg] = useState('')
   const [orderMsg, setOrderMsg] = useState('')
@@ -162,10 +168,7 @@ export function AdminPanel({ client, onClose, money, fullPage = false }: Props) 
           .select(
             'order_id,recipient_name,phone,address_line,city,province,postal_code,delivery_note,subtotal_amount,shipping_amount,shipping_courier,tracking_code'
           )
-          .in(
-            'order_id',
-            nextOrders.map((order) => order.id)
-          )
+          .in('order_id', nextOrders.map((order) => order.id))
 
         if (detailError) {
           setOrderMsg(`Alamat pesanan belum bisa dimuat: ${detailError.message}`)
@@ -173,10 +176,7 @@ export function AdminPanel({ client, onClose, money, fullPage = false }: Props) 
 
         setDeliveries(
           Object.fromEntries(
-            ((detailData ?? []) as unknown as Delivery[]).map((delivery) => [
-              delivery.order_id,
-              delivery,
-            ])
+            ((detailData ?? []) as unknown as Delivery[]).map((d) => [d.order_id, d])
           )
         )
       } else {
@@ -203,7 +203,6 @@ export function AdminPanel({ client, onClose, money, fullPage = false }: Props) 
     void loadProducts()
   }, [loadData, loadProducts])
 
-  // Tutup modal dengan tombol Escape jika bukan mode fullPage
   useEffect(() => {
     if (fullPage || !onClose) return
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -216,7 +215,6 @@ export function AdminPanel({ client, onClose, money, fullPage = false }: Props) 
   async function saveAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (busyTarget) return
-
     setBusyTarget('account')
     setAccountMsg('')
 
@@ -253,7 +251,7 @@ export function AdminPanel({ client, onClose, money, fullPage = false }: Props) 
     if (error) {
       setMeasurementMsg(`Ukuran belum tersimpan: ${error.message}`)
     } else {
-      setMeasurementMsg('Keterangan ukuran tersimpan dan tampil di toko.')
+      setMeasurementMsg('Keterangan ukuran tersimpan dan langsung tampil di toko.')
       await loadProducts(selectedProductId)
     }
 
@@ -280,10 +278,7 @@ export function AdminPanel({ client, onClose, money, fullPage = false }: Props) 
       return
     }
 
-    if (
-      action === 'batalkan' &&
-      !window.confirm('Batalkan pesanan ini dan kembalikan stoknya?')
-    ) {
+    if (action === 'batalkan' && !window.confirm('Batalkan pesanan ini dan kembalikan stoknya?')) {
       return
     }
 
@@ -308,363 +303,411 @@ export function AdminPanel({ client, onClose, money, fullPage = false }: Props) 
     setBusyTarget(null)
   }
 
+  // Summary Metrics
+  const pendingPayment = orders.filter((o) => o.status === 'menunggu_pembayaran').length
+  const pendingTransfer = orders.filter((o) => o.status === 'menunggu_transfer').length
+  const inProcess = orders.filter((o) => o.status === 'diproses').length
+  const shipped = orders.filter((o) => o.status === 'dikirim').length
+
   return (
-    <div
-      className={fullPage ? 'admin-page-shell' : 'admin-overlay'}
-      role={fullPage ? undefined : 'dialog'}
-      aria-modal={fullPage ? undefined : true}
-      aria-label="Panel admin"
-      onClick={(event) => {
-        if (!fullPage && onClose && event.target === event.currentTarget) {
-          onClose()
-        }
-      }}
-    >
-      <section className={`admin-panel${fullPage ? ' admin-panel-page' : ''}`}>
-        <header className="admin-panel-header">
-          <div>
-            <p className="eyebrow dark">
-              <span>ADMIN</span> HEBBUNA STORE
-            </p>
-            <h2>Kelola toko</h2>
-            <p>Produk, pesanan, rekening transfer, dan aktivitas kasir.</p>
+    <div className={fullPage ? 'w-full' : 'fixed inset-0 z-50 overflow-y-auto bg-black/25 p-4 backdrop-blur-sm'}>
+      <div className="flex flex-col gap-8">
+        {/* Statistical Summary Cards */}
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+          <div className="rounded-2xl border border-[#EAE2D6] bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between text-[#736A63]">
+              <span className="text-[11px] uppercase tracking-wider font-medium">Perlu Ongkir</span>
+              <Clock className="h-4 w-4 text-[#96785D]" strokeWidth={1.5} />
+            </div>
+            <p className="mt-2 text-2xl font-semibold text-[#24201D]">{pendingPayment}</p>
           </div>
-          {fullPage ? (
-            <Link className="admin-back-link" href="/">
-              Kembali ke toko ↗
-            </Link>
-          ) : (
+
+          <div className="rounded-2xl border border-[#EAE2D6] bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between text-[#736A63]">
+              <span className="text-[11px] uppercase tracking-wider font-medium">Cek Transfer</span>
+              <Banknote className="h-4 w-4 text-[#96785D]" strokeWidth={1.5} />
+            </div>
+            <p className="mt-2 text-2xl font-semibold text-[#24201D]">{pendingTransfer}</p>
+          </div>
+
+          <div className="rounded-2xl border border-[#EAE2D6] bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between text-[#736A63]">
+              <span className="text-[11px] uppercase tracking-wider font-medium">Perlu Kemas</span>
+              <Package className="h-4 w-4 text-[#96785D]" strokeWidth={1.5} />
+            </div>
+            <p className="mt-2 text-2xl font-semibold text-[#24201D]">{inProcess}</p>
+          </div>
+
+          <div className="rounded-2xl border border-[#EAE2D6] bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between text-[#736A63]">
+              <span className="text-[11px] uppercase tracking-wider font-medium">Dalam Kirim</span>
+              <Truck className="h-4 w-4 text-[#96785D]" strokeWidth={1.5} />
+            </div>
+            <p className="mt-2 text-2xl font-semibold text-[#24201D]">{shipped}</p>
+          </div>
+        </section>
+
+        {/* Section 1: Orders Management (Stacked Cards on Mobile, Modern Grid/Table on Desktop) */}
+        <section className="rounded-2xl border border-[#EAE2D6] bg-white p-5 sm:p-6 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-[#EAE2D6] pb-4">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#96785D]">
+                PESANAN ONLINE MASUK
+              </p>
+              <h2 className="mt-1 font-serif text-2xl font-normal text-[#24201D]">
+                Daftar Pesanan Toko ({orders.length})
+              </h2>
+            </div>
+
             <button
               type="button"
-              className="close-drawer"
-              onClick={onClose}
-              aria-label="Tutup panel admin"
+              onClick={() => {
+                void loadData(true)
+                void loadProducts(selectedProductId)
+              }}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-full border border-[#EAE2D6] bg-[#FCFBF8] px-3.5 py-1.5 text-xs font-medium text-[#736A63] transition-colors hover:border-[#96785D] hover:text-[#24201D]"
             >
-              ×
+              <RefreshCw className={`h-3.5 w-3.5 text-[#96785D] ${loading ? 'animate-spin' : ''}`} strokeWidth={1.5} />
+              <span>Muat Ulang</span>
             </button>
-          )}
-        </header>
-
-        {/* Bagian 1: Ukuran Produk */}
-        <section className="admin-account-card">
-          <div>
-            <h3>Ukuran dan detail produk</h3>
-            <p>Isi ukuran yang relevan. Keterangan ini muncul di kartu produk pada website.</p>
           </div>
-          <form className="admin-measurement-form" onSubmit={saveMeasurements}>
-            <label className="wide">
-              Pilih produk
+
+          {orderMsg && (
+            <p className="mt-4 rounded-xl border border-[#EAE2D6] bg-[#F5EDE2] p-3 text-xs text-[#24201D]" role="status">
+              {orderMsg}
+            </p>
+          )}
+
+          {loading ? (
+            <p className="mt-8 text-center text-xs text-[#736A63]">Memuat data pesanan…</p>
+          ) : orders.length === 0 ? (
+            <p className="mt-8 text-center text-xs text-[#736A63]">Belum ada pesanan online.</p>
+          ) : (
+            <div className="mt-6 flex flex-col gap-4">
+              {orders.map((order) => {
+                const delivery = deliveries[order.id]
+                const isOrderBusy = busyTarget === order.id
+                const st = labelStatus[order.status] ?? { label: order.status, badge: 'border-[#EAE2D6] bg-gray-50 text-gray-700' }
+                const phoneClean = (delivery?.phone ?? '').replace(/\D/g, '')
+                const waLink = phoneClean ? `https://wa.me/${phoneClean.startsWith('0') ? '62' + phoneClean.slice(1) : phoneClean}` : null
+
+                return (
+                  <article
+                    key={order.id}
+                    className="flex flex-col gap-4 rounded-2xl border border-[#EAE2D6] bg-[#FCFBF8] p-4 sm:p-5 text-xs transition-shadow hover:shadow-sm"
+                  >
+                    {/* Header info */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#EAE2D6] pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-semibold text-[#24201D]">#{order.id.slice(0, 8)}</span>
+                        <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${st.badge}`}>
+                          {st.label}
+                        </span>
+                      </div>
+                      <time className="text-[11px] text-[#736A63]">
+                        {new Date(order.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+                      </time>
+                    </div>
+
+                    {/* Customer & Items in Mobile-Friendly Stacked Layout */}
+                    <div className="grid gap-4 md:grid-cols-12">
+                      {/* Customer Info */}
+                      <div className="md:col-span-5 flex flex-col gap-1">
+                        <strong className="text-sm font-semibold text-[#24201D]">
+                          {delivery?.recipient_name ?? order.customer_name ?? 'Pelanggan'}
+                        </strong>
+                        {delivery?.phone && (
+                          <div className="flex items-center gap-1.5 text-xs text-[#736A63]">
+                            <span>{delivery.phone}</span>
+                            {waLink && (
+                              <a
+                                href={waLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 rounded-full border border-[#EAE2D6] bg-white px-2 py-0.5 text-[10px] text-emerald-700 hover:bg-emerald-50"
+                              >
+                                <MessageCircle className="h-2.5 w-2.5" strokeWidth={1.5} />
+                                <span>WhatsApp</span>
+                              </a>
+                            )}
+                          </div>
+                        )}
+                        <p className="mt-1 text-[11px] leading-relaxed text-[#736A63]">
+                          {delivery
+                            ? `${delivery.address_line}, ${delivery.city}, ${delivery.province} ${delivery.postal_code}`
+                            : 'Alamat belum diisi'}
+                        </p>
+                        {delivery?.delivery_note && (
+                          <p className="text-[10px] text-[#96785D] italic">Catatan: {delivery.delivery_note}</p>
+                        )}
+                      </div>
+
+                      {/* Items */}
+                      <div className="md:col-span-7 flex flex-col justify-between border-t border-[#EAE2D6] pt-3 md:border-t-0 md:border-l md:pl-5 md:pt-0">
+                        <ul className="flex flex-col gap-1.5">
+                          {(order.order_items ?? []).map((item, idx) => (
+                            <li key={`${order.id}-${idx}`} className="flex justify-between items-center text-xs">
+                              <span className="text-[#24201D]">
+                                {item.product_variants?.products?.name ?? 'Produk'} ·{' '}
+                                <span className="text-[#736A63]">
+                                  {[item.product_variants?.color, item.product_variants?.size].filter(Boolean).join(' / ') || 'Varian'}
+                                </span>
+                              </span>
+                              <b className="font-medium text-[#24201D]">
+                                {item.quantity} × {money(Number(item.price_at_purchase) || 0)}
+                              </b>
+                            </li>
+                          ))}
+                        </ul>
+
+                        <div className="mt-3 flex items-center justify-between border-t border-[#EAE2D6] pt-2 text-xs">
+                          <span className="text-[#736A63]">
+                            Subtotal {money(Number(delivery?.subtotal_amount ?? order.total_amount) || 0)} · Ongkir {money(Number(delivery?.shipping_amount ?? 0))}
+                          </span>
+                          <span className="text-sm font-semibold text-[#24201D]">
+                            Total: {money(Number(order.total_amount) || 0)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Order Action Buttons */}
+                    {(order.status === 'menunggu_pembayaran' || order.status === 'menunggu_transfer') && (
+                      <div className="flex flex-wrap items-center gap-2 border-t border-[#EAE2D6] pt-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-medium text-[#736A63]">Ongkir:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="500"
+                            placeholder="Rp"
+                            value={shippingAmounts[order.id] ?? String(delivery?.shipping_amount ?? 0)}
+                            onChange={(e) => setShippingAmounts((prev) => ({ ...prev, [order.id]: e.target.value }))}
+                            className="h-8 w-28 rounded-lg border border-[#EAE2D6] bg-white px-2.5 text-xs text-[#24201D] outline-none"
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => void runAction(order, 'set_ongkir')}
+                          disabled={Boolean(busyTarget)}
+                          className="rounded-full bg-[#24201D] px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-black disabled:opacity-50"
+                        >
+                          {isOrderBusy ? 'Proses…' : 'Tetapkan Ongkir'}
+                        </button>
+
+                        {order.status === 'menunggu_transfer' && (
+                          <button
+                            type="button"
+                            onClick={() => void runAction(order, 'konfirmasi_pembayaran')}
+                            disabled={Boolean(busyTarget)}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                            <span>Konfirmasi Transfer</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => void runAction(order, 'batalkan')}
+                          disabled={Boolean(busyTarget)}
+                          className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-50 ml-auto"
+                        >
+                          Batalkan
+                        </button>
+                      </div>
+                    )}
+
+                    {order.status === 'diproses' && (
+                      <div className="flex flex-wrap items-center gap-2 border-t border-[#EAE2D6] pt-3">
+                        <input
+                          placeholder="Kurir (JNE, J&T, SiCepat)"
+                          value={couriers[order.id] ?? delivery?.shipping_courier ?? ''}
+                          onChange={(e) => setCouriers((prev) => ({ ...prev, [order.id]: e.target.value }))}
+                          className="h-8 rounded-lg border border-[#EAE2D6] bg-white px-2.5 text-xs text-[#24201D] outline-none"
+                        />
+                        <input
+                          placeholder="Nomor Resi Pengiriman"
+                          value={trackingCodes[order.id] ?? delivery?.tracking_code ?? ''}
+                          onChange={(e) => setTrackingCodes((prev) => ({ ...prev, [order.id]: e.target.value }))}
+                          className="h-8 rounded-lg border border-[#EAE2D6] bg-white px-2.5 text-xs text-[#24201D] outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void runAction(order, 'kirim')}
+                          disabled={Boolean(busyTarget)}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-[#24201D] px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-black disabled:opacity-50"
+                        >
+                          <span>{isOrderBusy ? 'Menyimpan…' : 'Tandai Dikirim'}</span>
+                          <Truck className="h-3.5 w-3.5" strokeWidth={1.5} />
+                        </button>
+                      </div>
+                    )}
+
+                    {order.status === 'dikirim' && (
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#EAE2D6] pt-3 text-xs">
+                        <span className="text-[#736A63]">
+                          Kurir: <b className="text-[#24201D]">{delivery?.shipping_courier ?? '-'}</b> · Resi: <b className="font-mono text-[#24201D]">{delivery?.tracking_code ?? '-'}</b>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => void runAction(order, 'selesai')}
+                          disabled={Boolean(busyTarget)}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                          <span>Tandai Selesai</span>
+                        </button>
+                      </div>
+                    )}
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Section 2: Product Measurements Management */}
+        <section className="rounded-2xl border border-[#EAE2D6] bg-white p-5 sm:p-6 shadow-sm">
+          <div className="border-b border-[#EAE2D6] pb-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#96785D]">
+              KATALOG & PENGUKURAN
+            </p>
+            <h2 className="mt-1 font-serif text-2xl font-normal text-[#24201D]">
+              Ukuran & Rincian Produk
+            </h2>
+            <p className="mt-1 text-xs text-[#736A63]">
+              Keterangan ukuran ini akan langsung muncul di halaman detail produk pada website.
+            </p>
+          </div>
+
+          <form onSubmit={saveMeasurements} className="mt-5 flex flex-col gap-4 text-xs">
+            <label className="flex flex-col gap-1.5 font-medium text-[#24201D]">
+              Pilih Produk
               <select
                 value={selectedProductId}
-                onChange={(event) => {
-                  const id = event.target.value
+                onChange={(e) => {
+                  const id = e.target.value
                   setSelectedProductId(id)
                   setMeasurementMsg('')
-                  setMeasurements(
-                    catalogProducts.find((product) => product.product_id === id)?.measurements ?? {}
-                  )
+                  setMeasurements(catalogProducts.find((p) => p.product_id === id)?.measurements ?? {})
                 }}
+                className="h-10 rounded-xl border border-[#EAE2D6] bg-white px-3 text-xs text-[#24201D] outline-none"
               >
-                <option value="">
-                  {catalogProducts.length === 0 ? 'Belum ada produk' : 'Pilih produk'}
-                </option>
-                {catalogProducts.map((product) => (
-                  <option key={product.product_id} value={product.product_id}>
-                    {product.product_name}
-                    {product.category_name ? ` · ${product.category_name}` : ''}
+                <option value="">{catalogProducts.length === 0 ? 'Belum ada produk' : 'Pilih produk untuk diatur ukurannya'}</option>
+                {catalogProducts.map((p) => (
+                  <option key={p.product_id} value={p.product_id}>
+                    {p.product_name} {p.category_name ? `· ${p.category_name}` : ''}
                   </option>
                 ))}
               </select>
             </label>
 
-            {measurementFields.map(([key, label]) => (
-              <label key={key}>
-                {label}
-                <input
-                  inputMode="decimal"
-                  placeholder="Contoh: 108"
-                  value={measurements[key] ?? ''}
-                  onChange={(event) =>
-                    setMeasurements((old) => ({ ...old, [key]: event.target.value }))
-                  }
-                />
-              </label>
-            ))}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {measurementFields.map(([key, label]) => (
+                <label key={key} className="flex flex-col gap-1 text-[#24201D]">
+                  <span className="text-[11px] text-[#736A63]">{label}</span>
+                  <input
+                    inputMode="decimal"
+                    placeholder="Contoh: 110"
+                    value={measurements[key] ?? ''}
+                    onChange={(e) => setMeasurements((prev) => ({ ...prev, [key]: e.target.value }))}
+                    className="h-9 rounded-xl border border-[#EAE2D6] bg-white px-2.5 text-xs text-[#24201D] outline-none focus:border-[#96785D]"
+                  />
+                </label>
+              ))}
+            </div>
 
-            <label className="wide">
-              Catatan ukuran
+            <label className="flex flex-col gap-1 text-[#24201D]">
+              <span className="text-[11px] text-[#736A63]">Catatan Ukuran Tambahan</span>
               <textarea
                 rows={2}
-                placeholder="Contoh: ukuran diukur manual, toleransi 1–2 cm"
+                placeholder="Contoh: toleransi jahitan 1-2 cm"
                 value={measurements.catatan ?? ''}
-                onChange={(event) =>
-                  setMeasurements((old) => ({ ...old, catatan: event.target.value }))
-                }
+                onChange={(e) => setMeasurements((prev) => ({ ...prev, catatan: e.target.value }))}
+                className="rounded-xl border border-[#EAE2D6] bg-white px-3 py-2 text-xs text-[#24201D] outline-none focus:border-[#96785D]"
               />
             </label>
 
-            <button
-              type="submit"
-              className="primary-button dark-button wide"
-              disabled={Boolean(busyTarget) || !selectedProduct}
-            >
-              {busyTarget === 'measurements' ? 'Menyimpan…' : 'Simpan keterangan ukuran'}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={Boolean(busyTarget) || !selectedProduct}
+                className="rounded-full bg-[#24201D] px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-white shadow-sm hover:bg-black disabled:opacity-40"
+              >
+                {busyTarget === 'measurements' ? 'Menyimpan…' : 'Simpan Keterangan Ukuran'}
+              </button>
+              {measurementMsg && (
+                <span className="text-xs text-[#96785D]" role="status">{measurementMsg}</span>
+              )}
+            </div>
           </form>
-          {measurementMsg && (
-            <p className="admin-message" role="status">
-              {measurementMsg}
-            </p>
-          )}
         </section>
 
-        {/* Bagian 2: Rekening Transfer */}
-        <section className="admin-account-card">
-          <div>
-            <h3>Rekening transfer</h3>
-            <p>Info ini disiapkan untuk pelanggan setelah ongkir ditetapkan.</p>
+        {/* Section 3: Transfer Payment Account Settings */}
+        <section className="rounded-2xl border border-[#EAE2D6] bg-white p-5 sm:p-6 shadow-sm">
+          <div className="border-b border-[#EAE2D6] pb-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#96785D]">
+              PENGATURAN PEMBAYARAN TOKO
+            </p>
+            <h2 className="mt-1 font-serif text-2xl font-normal text-[#24201D]">
+              Rekening Transfer Manual
+            </h2>
+            <p className="mt-1 text-xs text-[#736A63]">
+              Informasi rekening ini digunakan sebagai panduan pembayaran resmi pelanggan setelah penetapan ongkir.
+            </p>
           </div>
-          <form className="admin-account-form" onSubmit={saveAccount}>
-            <label>
-              Nama bank
+
+          <form onSubmit={saveAccount} className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3 text-xs">
+            <label className="flex flex-col gap-1 text-[#24201D]">
+              <span className="text-[11px] text-[#736A63]">Nama Bank</span>
               <input
                 value={account.bank_name}
-                onChange={(event) =>
-                  setAccount((old) => ({ ...old, bank_name: event.target.value }))
-                }
+                onChange={(e) => setAccount((prev) => ({ ...prev, bank_name: e.target.value }))}
+                placeholder="BCA, Mandiri, BNI"
                 required
+                className="h-9 rounded-xl border border-[#EAE2D6] bg-white px-2.5 text-xs text-[#24201D] outline-none focus:border-[#96785D]"
               />
             </label>
-            <label>
-              Nomor rekening
+            <label className="flex flex-col gap-1 text-[#24201D]">
+              <span className="text-[11px] text-[#736A63]">Nomor Rekening</span>
               <input
                 value={account.account_number}
-                onChange={(event) =>
-                  setAccount((old) => ({ ...old, account_number: event.target.value }))
-                }
+                onChange={(e) => setAccount((prev) => ({ ...prev, account_number: e.target.value }))}
+                placeholder="Contoh: 1234567890"
                 inputMode="numeric"
                 required
+                className="h-9 rounded-xl border border-[#EAE2D6] bg-white px-2.5 text-xs text-[#24201D] outline-none focus:border-[#96785D]"
               />
             </label>
-            <label>
-              Nama pemilik
+            <label className="flex flex-col gap-1 text-[#24201D]">
+              <span className="text-[11px] text-[#736A63]">Atas Nama Pemilik</span>
               <input
                 value={account.account_holder}
-                onChange={(event) =>
-                  setAccount((old) => ({ ...old, account_holder: event.target.value }))
-                }
+                onChange={(e) => setAccount((prev) => ({ ...prev, account_holder: e.target.value }))}
+                placeholder="Contoh: Hebbuna Store"
                 required
+                className="h-9 rounded-xl border border-[#EAE2D6] bg-white px-2.5 text-xs text-[#24201D] outline-none focus:border-[#96785D]"
               />
             </label>
-            <button
-              type="submit"
-              className="primary-button dark-button"
-              disabled={Boolean(busyTarget)}
-            >
-              {busyTarget === 'account' ? 'Menyimpan…' : 'Simpan rekening'}
-            </button>
+
+            <div className="sm:col-span-3 flex items-center gap-3 mt-2">
+              <button
+                type="submit"
+                disabled={Boolean(busyTarget)}
+                className="rounded-full bg-[#24201D] px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-white shadow-sm hover:bg-black disabled:opacity-40"
+              >
+                {busyTarget === 'account' ? 'Menyimpan…' : 'Simpan Info Rekening'}
+              </button>
+              {accountMsg && (
+                <span className="text-xs text-[#96785D]" role="status">{accountMsg}</span>
+              )}
+            </div>
           </form>
-          {accountMsg && (
-            <p className="admin-message" role="status">
-              {accountMsg}
-            </p>
-          )}
         </section>
-
-        {/* Bagian 3: Daftar Pesanan */}
-        <div className="admin-list-heading">
-          <div>
-            <h3>Daftar pesanan</h3>
-            <span>{orders.length} terbaru</span>
-          </div>
-          <button
-            type="button"
-            className="admin-refresh"
-            onClick={() => {
-              void loadData(true)
-              void loadProducts(selectedProductId)
-            }}
-            disabled={loading}
-          >
-            Muat ulang ↻
-          </button>
-        </div>
-
-        {orderMsg && (
-          <p className="admin-message" role="status">
-            {orderMsg}
-          </p>
-        )}
-
-        {loading ? (
-          <p className="admin-empty">Memuat pesanan…</p>
-        ) : orders.length === 0 ? (
-          <p className="admin-empty">Belum ada pesanan online.</p>
-        ) : (
-          <div className="admin-order-list">
-            {orders.map((order) => {
-              const delivery = deliveries[order.id]
-              const isOrderBusy = busyTarget === order.id
-
-              return (
-                <article className="admin-order-card" key={order.id}>
-                  <div className="admin-order-top">
-                    <div>
-                      <span className="admin-order-code">#{order.id.slice(0, 8)}</span>
-                      <span className={`admin-status status-${order.status}`}>
-                        {labelStatus[order.status] ?? order.status}
-                      </span>
-                    </div>
-                    <time>
-                      {new Date(order.created_at).toLocaleString('id-ID', {
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                      })}
-                    </time>
-                  </div>
-
-                  <div className="admin-order-columns">
-                    <div>
-                      <h4>{delivery?.recipient_name ?? order.customer_name ?? 'Pelanggan'}</h4>
-                      <p>{delivery?.phone ?? 'Nomor belum tersedia'}</p>
-                      <p>
-                        {delivery
-                          ? `${delivery.address_line}, ${delivery.city}, ${delivery.province} ${delivery.postal_code}`
-                          : 'Alamat belum tersedia'}
-                      </p>
-                      {delivery?.delivery_note && (
-                        <p className="admin-note">Catatan: {delivery.delivery_note}</p>
-                      )}
-                    </div>
-
-                    <ul className="admin-order-items">
-                      {(order.order_items ?? []).map((item, index) => (
-                        <li key={`${order.id}-${index}`}>
-                          <span>
-                            {item.product_variants?.products?.name ?? 'Produk'} ·{' '}
-                            {[item.product_variants?.color, item.product_variants?.size]
-                              .filter(Boolean)
-                              .join(' / ') || 'Varian'}
-                          </span>
-                          <b>
-                            {item.quantity} × {money(Number(item.price_at_purchase) || 0)}
-                          </b>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="admin-order-total">
-                    <span>
-                      Subtotal {money(Number(delivery?.subtotal_amount ?? order.total_amount) || 0)}
-                    </span>
-                    <span>Ongkir {money(Number(delivery?.shipping_amount ?? 0) || 0)}</span>
-                    <strong>Total {money(Number(order.total_amount) || 0)}</strong>
-                  </div>
-
-                  {(order.status === 'menunggu_pembayaran' ||
-                    order.status === 'menunggu_transfer') && (
-                    <div className="admin-order-actions">
-                      <label>
-                        Ongkir
-                        <input
-                          type="number"
-                          min="0"
-                          step="500"
-                          value={shippingAmounts[order.id] ?? String(delivery?.shipping_amount ?? 0)}
-                          onChange={(event) =>
-                            setShippingAmounts((old) => ({
-                              ...old,
-                              [order.id]: event.target.value,
-                            }))
-                          }
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => void runAction(order, 'set_ongkir')}
-                        disabled={Boolean(busyTarget)}
-                      >
-                        {isOrderBusy ? 'Memproses…' : 'Tetapkan ongkir'}
-                      </button>
-                      {order.status === 'menunggu_transfer' && (
-                        <button
-                          type="button"
-                          className="confirm-action"
-                          onClick={() => void runAction(order, 'konfirmasi_pembayaran')}
-                          disabled={Boolean(busyTarget)}
-                        >
-                          Konfirmasi transfer
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="cancel-action"
-                        onClick={() => void runAction(order, 'batalkan')}
-                        disabled={Boolean(busyTarget)}
-                      >
-                        Batalkan
-                      </button>
-                    </div>
-                  )}
-
-                  {order.status === 'diproses' && (
-                    <div className="admin-order-actions shipment-fields">
-                      <label>
-                        Kurir
-                        <input
-                          placeholder="JNE, J&T, dll."
-                          value={couriers[order.id] ?? delivery?.shipping_courier ?? ''}
-                          onChange={(event) =>
-                            setCouriers((old) => ({ ...old, [order.id]: event.target.value }))
-                          }
-                        />
-                      </label>
-                      <label>
-                        Nomor resi
-                        <input
-                          placeholder="Nomor resi"
-                          value={trackingCodes[order.id] ?? delivery?.tracking_code ?? ''}
-                          onChange={(event) =>
-                            setTrackingCodes((old) => ({
-                              ...old,
-                              [order.id]: event.target.value,
-                            }))
-                          }
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => void runAction(order, 'kirim')}
-                        disabled={Boolean(busyTarget)}
-                      >
-                        {isOrderBusy ? 'Memproses…' : 'Tandai dikirim'}
-                      </button>
-                    </div>
-                  )}
-
-                  {order.status === 'dikirim' && (
-                    <div className="admin-order-actions">
-                      <span>
-                        {delivery?.shipping_courier}{' '}
-                        {delivery?.tracking_code && `· ${delivery.tracking_code}`}
-                      </span>
-                      <button
-                        type="button"
-                        className="confirm-action"
-                        onClick={() => void runAction(order, 'selesai')}
-                        disabled={Boolean(busyTarget)}
-                      >
-                        {isOrderBusy ? 'Memproses…' : 'Tandai selesai'}
-                      </button>
-                    </div>
-                  )}
-                </article>
-              )
-            })}
-          </div>
-        )}
-      </section>
+      </div>
     </div>
   )
 }

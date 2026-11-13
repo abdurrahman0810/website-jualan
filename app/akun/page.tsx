@@ -14,10 +14,10 @@ export default function AccountPage() {
   useEffect(() => {
     let current = true
     async function checkSession() {
-      if (!supabase) { router.replace('/'); return }
+      if (!supabase) { router.replace('/login'); return }
       const { data } = await supabase.auth.getSession()
       if (!current) return
-      if (!data.session?.user) { router.replace('/'); return }
+      if (!data.session?.user) { router.replace('/login'); return }
       setUser(data.session.user)
       setChecking(false)
     }
@@ -25,6 +25,15 @@ export default function AccountPage() {
     return () => { current = false }
   }, [router])
 
-  if (checking) return <main className="admin-dashboard-loading">Memeriksa akun…</main>
+  if (checking) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#FCFBF8] text-[#736A63] text-xs">
+        <div className="flex items-center gap-2.5">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#96785D] border-t-transparent" />
+          <span className="font-sans">Memeriksa status akun…</span>
+        </div>
+      </main>
+    )
+  }
   return user ? <CustomerAccount user={user} /> : null
 }

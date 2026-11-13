@@ -2,45 +2,87 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import Image from 'next/image'
-import dynamic from 'next/dynamic'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
+import { AnimatePresence, motion } from 'motion/react'
+import {
+  ArrowUpRight,
+  Heart,
+  Search,
+  ShoppingBag,
+  Sparkles,
+  X,
+} from 'lucide-react'
 import { supabase, supabaseConfigured } from './lib/supabase'
 import { mapCatalog, type CatalogRow, type Product, type Variant } from './lib/catalog'
 import { StorefrontNavbar } from './components/StorefrontNavbar'
 
-const LoginModal = dynamic(() => import('./components/LoginModal').then((module) => module.LoginModal), { ssr: false })
-const CartDrawer = dynamic(() => import('./components/CartDrawer').then((module) => module.CartDrawer), { ssr: false })
-
 const sampleProducts: Product[] = [
-  { id: 'sample-1', name: 'Pashmina Aira', category: 'Pashmina', price: 89000, imageUrl: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=760&q=85', description: 'Pashmina ringan untuk menemani hari-hari kamu.', material: 'Voal lembut', measurements: {}, label: 'Favorit', variants: [{ id: 'sample-1a', size: 'All size', color: 'Peach Bloom', available: true }, { id: 'sample-1b', size: 'All size', color: 'Butter', available: true }, { id: 'sample-1c', size: 'All size', color: 'Moss', available: true }] },
-  { id: 'sample-2', name: 'Segi Empat Nala', category: 'Segi Empat', price: 75000, imageUrl: 'https://images.unsplash.com/photo-1590736969955-71cc94901144?auto=format&fit=crop&w=760&q=85', description: 'Segi empat nyaman dengan warna yang mudah dipadu.', material: 'Voal airy', measurements: {}, label: 'Baru', variants: [{ id: 'sample-2a', size: 'All size', color: 'Cream', available: true }, { id: 'sample-2b', size: 'All size', color: 'Rose', available: true }] },
-  { id: 'sample-3', name: 'Pashmina Safa', category: 'Pashmina', price: 95000, imageUrl: 'https://images.unsplash.com/photo-1584184924103-e310d9dc82fc?auto=format&fit=crop&w=760&q=85', description: 'Tekstur halus dan mudah dibentuk.', material: 'Chiffon', measurements: {}, variants: [{ id: 'sample-3a', size: 'All size', color: 'Lilac', available: true }, { id: 'sample-3b', size: 'All size', color: 'Sand', available: true }] },
-  { id: 'sample-4', name: 'Inner Sakinah', category: 'Inner', price: 39000, imageUrl: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=760&q=85', description: 'Inner simpel untuk dipakai seharian.', material: 'Cotton stretch', measurements: {}, variants: [{ id: 'sample-4a', size: 'All size', color: 'Almond', available: true }, { id: 'sample-4b', size: 'All size', color: 'Charcoal', available: true }] },
+  { id: 'sample-1', name: 'Pashmina Aira Voal', category: 'Pashmina', price: 89000, imageUrl: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=760&q=85', description: 'Pashmina voal premium yang ringan, breathable, dan mudah dibentuk dengan drape anggun.', material: 'Voal Lembut', measurements: {}, label: 'Favorit', variants: [{ id: 'sample-1a', size: 'All size', color: 'Peach Bloom', available: true }, { id: 'sample-1b', size: 'All size', color: 'Soft Butter', available: true }, { id: 'sample-1c', size: 'All size', color: 'Warm Moss', available: true }] },
+  { id: 'sample-2', name: 'Segi Empat Nala Airy', category: 'Segi Empat', price: 75000, imageUrl: 'https://images.unsplash.com/photo-1590736969955-71cc94901144?auto=format&fit=crop&w=760&q=85', description: 'Segi empat nyaman dengan tekstur airy yang rapi seharian tanpa mudah kusut.', material: 'Voal Ultrafine', measurements: {}, label: 'Terbaru', variants: [{ id: 'sample-2a', size: 'All size', color: 'Warm Cream', available: true }, { id: 'sample-2b', size: 'All size', color: 'Dusty Rose', available: true }] },
+  { id: 'sample-3', name: 'Pashmina Safa Silk', category: 'Pashmina', price: 95000, imageUrl: 'https://images.unsplash.com/photo-1584184924103-e310d9dc82fc?auto=format&fit=crop&w=760&q=85', description: 'Kilau satin matte lembut memberikan aksen elegan untuk momen formal maupun harian.', material: 'Chiffon Silk', measurements: {}, variants: [{ id: 'sample-3a', size: 'All size', color: 'Lilac Dusk', available: true }, { id: 'sample-3b', size: 'All size', color: 'Desert Sand', available: true }] },
+  { id: 'sample-4', name: 'Inner Sakinah Comfort', category: 'Inner', price: 39000, imageUrl: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=760&q=85', description: 'Ciput rajut anti-pusing dengan elastisitas pas dan daya serap keringat tinggi.', material: 'Cotton Stretch', measurements: {}, variants: [{ id: 'sample-4a', size: 'All size', color: 'Almond Beige', available: true }, { id: 'sample-4b', size: 'All size', color: 'Charcoal', available: true }] },
 ]
 
 const money = (amount: number) => `Rp${amount.toLocaleString('id-ID')}`
 type SavedAddress = { id: string; label: string; recipient_name: string; phone: string; address_line: string; city: string; province: string; postal_code: string; delivery_note: string | null; is_default: boolean }
-const swatchPalette = ['#eeb2a2', '#f2d98a', '#a6ad8f', '#a96670', '#b6a2c3', '#9caebe']
+
+const swatchPalette = ['#E4C7B5', '#EFE3C3', '#C7CEB8', '#D8B8B5', '#D2C8DB', '#C6D2DB']
 const colorHex: Record<string, string> = {
-  peach: '#eeb2a2', butter: '#f2d98a', moss: '#a6ad8f', berry: '#a96670',
-  cream: '#eee0c9', rose: '#dfaaa7', sky: '#9caebe', lilac: '#b6a2c3',
-  sand: '#c7ae91', cocoa: '#856b60', almond: '#d8bea4', charcoal: '#514b4b',
-  blush: '#d6a8a4', hitam: '#393438', putih: '#f2ece2', navy: '#515d76',
+  peach: '#E4C7B5', butter: '#EFE3C3', moss: '#C7CEB8', berry: '#C79E9F',
+  cream: '#F4ECE1', rose: '#DFB8B5', sky: '#C6D2DB', lilac: '#D2C8DB',
+  sand: '#D9CBB7', cocoa: '#A89284', almond: '#E0D0BF', charcoal: '#5A5450',
+  blush: '#E5C0BC', hitam: '#2E2A27', putih: '#FBF9F5', navy: '#4F596B',
 }
+
 function getColorHex(name: string, index: number) {
   const match = Object.entries(colorHex).find(([key]) => name.toLowerCase().includes(key))
   return match?.[1] ?? swatchPalette[index % swatchPalette.length]
 }
+
 function measurementUnit(key: string) {
   return key === 'catatan' ? '' : ' cm'
 }
-function BagIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l1 13H4L5 8Z" /><path d="M9 9V6a3 3 0 0 1 6 0v3" /></svg>
+
+const liquidSpring = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.8 }
+
+const LIQUID_GLASS =
+  'border border-white/90 bg-[#FFFEFB]/85 shadow-[0_20px_50px_rgba(120,100,80,0.08),inset_0_1px_1px_rgba(255,255,255,0.95)] backdrop-blur-md md:backdrop-blur-xl text-[#24201D]'
+
+function ProductImage({ src, alt, priority = false }: { src: string | null; alt: string; priority?: boolean }) {
+  const [loaded, setLoaded] = useState(false)
+  if (!src) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-[#EFE7DC] text-xs text-[#736A63]">
+        Hebbuna
+      </div>
+    )
+  }
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-[#EFE7DC]">
+      {!loaded && <div className="absolute inset-0 shimmer-placeholder z-0" />}
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        priority={priority}
+        loading={priority ? 'eager' : 'lazy'}
+        decoding="async"
+        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+        onLoad={() => setLoaded(true)}
+        className={`object-cover object-center transition-all duration-500 ${
+          loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
+        } group-hover:scale-105`}
+      />
+    </div>
+  )
 }
 
 type StorefrontPage = 'home' | 'shop' | 'collection' | 'about'
 
-function App({ initialProducts, initialCatalogError, page = 'home' }: { initialProducts: Product[] | null; initialCatalogError: string | null; page?: StorefrontPage }) {
+export default function App({ initialProducts, initialCatalogError, page = 'home' }: { initialProducts: Product[] | null; initialCatalogError: string | null; page?: StorefrontPage }) {
+  const router = useRouter()
   const [products, setProducts] = useState<Product[]>(initialProducts ?? (supabaseConfigured ? [] : sampleProducts))
   const catalogState: 'demo' | 'live' | 'error' = initialProducts !== null ? 'live' : initialCatalogError ? 'error' : 'demo'
   const catalogError = initialCatalogError ?? ''
@@ -49,7 +91,7 @@ function App({ initialProducts, initialCatalogError, page = 'home' }: { initialP
   const [canLoadMore, setCanLoadMore] = useState((initialProducts?.length ?? 0) >= catalogPageSize)
   const [loadingMore, setLoadingMore] = useState(false)
   const [category, setCategory] = useState('Semua')
-  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [activeProduct, setActiveProduct] = useState<Product | null>(null)
   const [productDetailsLoading, setProductDetailsLoading] = useState(false)
@@ -64,43 +106,73 @@ function App({ initialProducts, initialCatalogError, page = 'home' }: { initialP
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [submittingOrder, setSubmittingOrder] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
-  const [loginOpen, setLoginOpen] = useState(false)
-  const [loginEmail, setLoginEmail] = useState('')
-  const [loginPassword, setLoginPassword] = useState('')
-  const [loginError, setLoginError] = useState('')
-  const [loginBusy, setLoginBusy] = useState(false)
-  const [checkoutAfterLogin, setCheckoutAfterLogin] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [role, setRole] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
+
+  // Debounce search input by 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchTerm(searchInput.trim())
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  // Prevent background scrolling when modal or cart drawer is open
+  useEffect(() => {
+    if (activeProduct || cartOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [activeProduct, cartOpen])
+
   const categories = useMemo(() => ['Semua', ...new Set(products.map((product) => product.category).filter(Boolean))], [products])
-  const visibleProducts = useMemo(() => products.filter((product) => (category === 'Semua' || product.category === category) && (!searchTerm.trim() || `${product.name} ${product.category} ${product.description}`.toLowerCase().includes(searchTerm.toLowerCase()))), [category, products, searchTerm])
+  
+  const visibleProducts = useMemo(() => {
+    return products.filter((product) => {
+      const matchCat = category === 'Semua' || product.category === category
+      const matchSearch = !searchTerm || `${product.name} ${product.category} ${product.description}`.toLowerCase().includes(searchTerm.toLowerCase())
+      return matchCat && matchSearch
+    })
+  }, [category, products, searchTerm])
+
   const bestSellerProducts = useMemo(() => {
     const marked = visibleProducts.filter((product) => product.isBestSeller)
     return (marked.length ? marked : visibleProducts).slice(0, 4)
   }, [visibleProducts])
+
   const hasBestSellerMarks = bestSellerProducts.some((product) => product.isBestSeller)
   const subtotal = cart.reduce((sum, item) => sum + item.product.price, 0)
   const selectedAddress = savedAddresses.find((address) => address.id === selectedAddressId)
 
+  // Local storage cart synchronization
   useEffect(() => {
-    const savedCart = window.localStorage.getItem('hebbuna-store-cart') ?? window.localStorage.getItem('ruangrona-cart')
-    window.setTimeout(() => {
-      if (savedCart) {
-        try {
-          setCart(JSON.parse(savedCart) as { product: Product; variant: Variant }[])
-        } catch {
-          window.localStorage.removeItem('hebbuna-store-cart')
-        }
+    const savedCart = window.localStorage.getItem('hebbuna-store-cart')
+    if (savedCart) {
+      try {
+        setCart(JSON.parse(savedCart) as { product: Product; variant: Variant }[])
+      } catch {
+        window.localStorage.removeItem('hebbuna-store-cart')
       }
-      setCartReady(true)
-    }, 0)
+    }
+    setCartReady(true)
   }, [])
 
+  useEffect(() => {
+    if (!cartReady) return
+    window.localStorage.setItem('hebbuna-store-cart', JSON.stringify(cart))
+  }, [cart, cartReady])
+
+  // Customer preferences
   useEffect(() => {
     const client = supabase
     if (!client || !user) return undefined
     let current = true
+
     const loadCustomerPreferences = async () => {
       const [{ data: wishlist }, { data: restocks }] = await Promise.all([
         client.from('customer_wishlist').select('product_id').eq('user_id', user.id),
@@ -112,54 +184,37 @@ function App({ initialProducts, initialCatalogError, page = 'home' }: { initialP
     }
     void loadCustomerPreferences()
 
-    const checkRestocks = async () => {
-      const { data } = await client.from('restock_notifications').select('id,variant_id')
-        .eq('user_id', user.id).not('notified_at', 'is', null).is('seen_at', null)
-      if (!current || !data?.length) return
-      const ids = data.map((item) => item.id)
-      await client.from('restock_notifications').update({ seen_at: new Date().toISOString() }).in('id', ids).eq('user_id', user.id)
-      if (current) {
-        setRestockIds((existing) => existing.filter((variantId) => !data.some((item) => item.variant_id === variantId)))
-        showNotice('Ada produk favoritmu yang kembali tersedia. Cek wishlist kamu.')
-      }
-    }
-    const initial = window.setTimeout(() => void checkRestocks(), 0)
-    const timer = window.setInterval(() => void checkRestocks(), 25_000)
-    return () => { current = false; window.clearTimeout(initial); window.clearInterval(timer) }
+    return () => { current = false }
   }, [user])
 
+  // Load customer addresses for checkout
   useEffect(() => {
     const client = supabase
     if (!client || !user || !checkoutOpen) return undefined
     let current = true
-    const initial = window.setTimeout(() => {
-      void client.from('customer_addresses').select('*').eq('user_id', user.id)
-        .order('is_default', { ascending: false }).order('created_at', { ascending: false })
-        .then(({ data }) => {
-          if (!current) return
-          const addresses = (data ?? []) as SavedAddress[]
-          setSavedAddresses(addresses)
-          const main = addresses.find((address) => address.is_default) ?? addresses[0]
-          if (main) setSelectedAddressId((selected) => selected || main.id)
-        })
-    }, 0)
-    return () => { current = false; window.clearTimeout(initial) }
+    void client.from('customer_addresses').select('*').eq('user_id', user.id)
+      .order('is_default', { ascending: false }).order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (!current) return
+        const addresses = (data ?? []) as SavedAddress[]
+        setSavedAddresses(addresses)
+        const main = addresses.find((address) => address.is_default) ?? addresses[0]
+        if (main) setSelectedAddressId((selected) => selected || main.id)
+      })
+    return () => { current = false }
   }, [checkoutOpen, user])
 
+  // Escape key listener for dialog
   useEffect(() => {
     if (!activeProduct) return undefined
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setActiveProduct(null) }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActiveProduct(null)
+    }
     window.addEventListener('keydown', closeOnEscape)
-    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener('keydown', closeOnEscape) }
+    return () => window.removeEventListener('keydown', closeOnEscape)
   }, [activeProduct])
 
-  useEffect(() => {
-    if (!cartReady) return
-    window.localStorage.setItem('hebbuna-store-cart', JSON.stringify(cart))
-  }, [cart, cartReady])
-
+  // Catalog loader
   useEffect(() => {
     const client = supabase
     if (!client || initialProducts !== null || page === 'about') return undefined
@@ -179,21 +234,25 @@ function App({ initialProducts, initialCatalogError, page = 'home' }: { initialP
     return () => { current = false }
   }, [catalogPageSize, initialProducts, page])
 
+  // Auth listener
   useEffect(() => {
     const client = supabase
     if (!client) return undefined
-
     let current = true
 
     void client.auth.getSession().then(({ data }) => {
       if (current) setUser(data.session?.user ?? null)
     })
+
     const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
       if (!current) return
       const signedInUser = session?.user ?? null
       setUser(signedInUser)
-      if (!signedInUser) { setRole(null); setWishlistIds([]); setRestockIds([]) }
-      else window.setTimeout(() => {
+      if (!signedInUser) {
+        setRole(null)
+        setWishlistIds([])
+        setRestockIds([])
+      } else {
         void client.from('user_profiles').select('role,is_active').eq('id', signedInUser.id).maybeSingle().then(({ data: profile }) => {
           if (!current) return
           if (profile?.is_active === false) {
@@ -202,7 +261,7 @@ function App({ initialProducts, initialCatalogError, page = 'home' }: { initialP
           }
           setRole(profile?.role ?? null)
         })
-      }, 0)
+      }
     })
 
     return () => {
@@ -216,54 +275,13 @@ function App({ initialProducts, initialCatalogError, page = 'home' }: { initialP
     window.setTimeout(() => setNotice(''), 2600)
   }
 
-  function openLogin(forCheckout = false) {
-    if (!supabase) {
-      showNotice('Sambungkan URL dan publishable key Supabase di .env.local dulu.')
-      return
-    }
-    setCheckoutAfterLogin(forCheckout)
-    setLoginError('')
-    setLoginOpen(true)
-  }
-
-  async function signInWithPassword(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!supabase || loginBusy) return
-    setLoginBusy(true)
-    setLoginError('')
-    const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail.trim(), password: loginPassword })
-    if (error) {
-      setLoginError(error.message.toLowerCase().includes('invalid login credentials') ? 'Email atau kata sandi belum cocok.' : `Login belum berhasil: ${error.message}`)
-      setLoginBusy(false)
-      return
-    }
-    setLoginPassword('')
-    setLoginOpen(false)
-    const { data: profile } = await supabase.from('user_profiles').select('role,is_active').eq('id', data.user.id).maybeSingle()
-    if (profile?.is_active === false) {
-      await supabase.auth.signOut()
-      setLoginError('Akun kasir ini sedang nonaktif. Hubungi admin toko.')
-      setLoginOpen(true)
-      setLoginBusy(false)
-      return
-    }
-    if (profile?.role === 'admin') {
-      window.location.assign('/admin')
-      return
-    }
-    setAccountOpen(!checkoutAfterLogin)
-    if (checkoutAfterLogin) setCheckoutOpen(true)
-    setCheckoutAfterLogin(false)
-    setLoginBusy(false)
-  }
-
   async function signOut() {
     if (!supabase) return
     const { error } = await supabase.auth.signOut()
-    if (error) showNotice('Belum berhasil keluar. Coba lagi.')
+    if (error) showNotice('Gagal keluar akun. Silakan coba lagi.')
     else {
       setAccountOpen(false)
-      showNotice('Kamu sudah keluar dari akun.')
+      showNotice('Berhasil keluar dari akun.')
     }
   }
 
@@ -293,7 +311,7 @@ function App({ initialProducts, initialCatalogError, page = 'home' }: { initialP
     const { data, error } = await supabase.rpc('daftar_produk_online')
       .select('product_id,product_name,slug,category_name,sell_price,image_url,variants')
       .range(catalogOffset, catalogOffset + 11)
-    if (error) showNotice('Produk berikutnya belum bisa dimuat. Coba lagi sebentar.')
+    if (error) showNotice('Produk berikutnya belum bisa dimuat.')
     else {
       const next = mapCatalog((data ?? []) as CatalogRow[])
       setProducts((current) => [...current, ...next])
@@ -310,7 +328,7 @@ function App({ initialProducts, initialCatalogError, page = 'home' }: { initialP
       return
     }
     setCart((current) => [...current, { product, variant }])
-    showNotice(`${product.name} · ${variant.color ?? variant.size ?? 'Varian'} masuk ke tas`)
+    showNotice(`${product.name} dimasukkan ke tas belanja.`)
   }
 
   function buyNow(product: Product) {
@@ -329,7 +347,7 @@ function App({ initialProducts, initialCatalogError, page = 'home' }: { initialP
   }
 
   async function toggleWishlist(product: Product) {
-    if (!user) { openLogin(); return }
+    if (!user) { router.push('/login'); return }
     if (!supabase) return
     const saved = wishlistIds.includes(product.id)
     const result = saved
@@ -338,28 +356,28 @@ function App({ initialProducts, initialCatalogError, page = 'home' }: { initialP
     if (result.error) showNotice(`Wishlist belum tersimpan: ${result.error.message}`)
     else {
       setWishlistIds((current) => saved ? current.filter((id) => id !== product.id) : [...current, product.id])
-      showNotice(saved ? `${product.name} dihapus dari wishlist.` : `${product.name} masuk ke wishlist.`)
+      showNotice(saved ? `${product.name} dihapus dari wishlist.` : `${product.name} disimpan ke wishlist.`)
     }
   }
 
   async function requestRestock(product: Product, variant: Variant) {
-    if (!user) { openLogin(); return }
+    if (!user) { router.push('/login'); return }
     if (!supabase) return
     const { error } = await supabase.from('restock_notifications').upsert({ user_id: user.id, variant_id: variant.id, notified_at: null, seen_at: null }, { onConflict: 'user_id,variant_id' })
     if (error) showNotice(`Permintaan belum tersimpan: ${error.message}`)
     else {
       setRestockIds((current) => current.includes(variant.id) ? current : [...current, variant.id])
-      showNotice(`Siap, kami kabari saat ${product.name} tersedia lagi.`)
+      showNotice(`Kami akan mengabari saat ${product.name} tersedia kembali.`)
     }
   }
 
   function beginCheckout() {
     if (!supabase || catalogState !== 'live') {
-      showNotice('Checkout aktif setelah katalog Supabase siap.')
+      showNotice('Katalog online sedang disiapkan.')
       return
     }
     if (!user) {
-      openLogin(true)
+      router.push('/login')
       return
     }
     setCheckoutOpen(true)
@@ -390,7 +408,7 @@ function App({ initialProducts, initialCatalogError, page = 'home' }: { initialP
 
       if (!selectedAddress && form.get('save_address') === 'on') {
         await supabase.rpc('simpan_alamat_pelanggan', {
-          p_address_id: null, p_label: 'Alamat checkout',
+          p_address_id: null, p_label: 'Alamat Utama',
           p_recipient_name: String(form.get('recipient_name') ?? '').trim(), p_phone: String(form.get('phone') ?? '').trim(),
           p_address_line: String(form.get('address_line') ?? '').trim(), p_city: String(form.get('city') ?? '').trim(),
           p_province: String(form.get('province') ?? '').trim(), p_postal_code: String(form.get('postal_code') ?? '').trim(),
@@ -400,9 +418,9 @@ function App({ initialProducts, initialCatalogError, page = 'home' }: { initialP
       setCart([])
       setCheckoutOpen(false)
       setCartOpen(false)
-      showNotice(`Pesanan ${String(data).slice(0, 8)} dibuat. Ongkir dikonfirmasi sebelum transfer.`)
+      showNotice(`Pesanan #${String(data).slice(0, 8)} berhasil dibuat.`)
     } catch {
-      showNotice('Koneksi bermasalah. Pesanan belum bisa dibuat, coba lagi sebentar.')
+      showNotice('Koneksi terganggu. Silakan coba kembali.')
     } finally {
       setSubmittingOrder(false)
     }
@@ -412,87 +430,722 @@ function App({ initialProducts, initialCatalogError, page = 'home' }: { initialP
 
   return (
     <>
-      <StorefrontNavbar page={page} user={user} role={role} cartCount={cart.length} wishlistCount={wishlistIds.length} accountOpen={accountOpen} onSearch={() => { if (page === 'about') { window.location.assign('/shop'); return } setSearchOpen(true); document.getElementById('koleksi')?.scrollIntoView({ behavior: 'smooth' }) }} onWishlist={() => user ? window.location.assign('/akun') : openLogin()} onCart={() => setCartOpen(true)} onLogin={() => openLogin()} onAccount={() => setAccountOpen(!accountOpen)} onSignOut={() => void signOut()} />
+      <StorefrontNavbar
+        page={page}
+        user={user}
+        role={role}
+        cartCount={cart.length}
+        wishlistCount={wishlistIds.length}
+        accountOpen={accountOpen}
+        onSearch={() => {
+          if (page === 'about') {
+            router.push('/shop')
+            return
+          }
+          document.getElementById('catalog-search-input')?.focus()
+          document.getElementById('koleksi')?.scrollIntoView({ behavior: 'smooth' })
+        }}
+        onWishlist={() => user ? router.push('/akun') : router.push('/login')}
+        onCart={() => setCartOpen(true)}
+        onAccount={() => setAccountOpen(!accountOpen)}
+        onSignOut={() => void signOut()}
+      />
 
-      {loginOpen && <div className="admin-overlay auth-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !loginBusy) setLoginOpen(false) }}><section className="auth-card" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="close-drawer auth-close" onClick={() => setLoginOpen(false)} aria-label="Tutup login">×</button><p className="eyebrow dark"><span>HEBBUNA STORE</span> AKUN TOKO</p><h2 id="login-title">Masuk dengan akun kasir</h2><p className="auth-intro">Pakai email dan kata sandi yang sama dengan akun Supabase di kasir.</p><form className="checkout-form" onSubmit={signInWithPassword}><label><span>Email</span><input type="email" autoComplete="username" required value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} placeholder="nama@email.com" /></label><label><span>Kata sandi</span><input type="password" autoComplete="current-password" required value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} placeholder="Kata sandi akun kasir" /></label>{loginError && <p className="auth-error" role="alert">{loginError}</p>}<button className="primary-button dark-button checkout-submit" type="submit" disabled={loginBusy}>{loginBusy ? 'Memeriksa akun…' : 'Masuk'} <span>↗</span></button></form></section></div>}
+      {/* Floating Apple Liquid Glass Product Modal */}
+      <AnimatePresence>
+        {activeProduct && (
+          <motion.div
+            className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto bg-black/25 p-4 backdrop-blur-sm sm:p-6"
+            role="presentation"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveProduct(null) }}
+          >
+            <motion.section
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Detail ${activeProduct.name}`}
+              initial={{ opacity: 0, y: 24, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.98 }}
+              transition={liquidSpring}
+              className={`relative grid w-full max-w-4xl overflow-hidden rounded-3xl ${LIQUID_GLASS} sm:grid-cols-2 max-sm:max-h-[90svh]`}
+            >
+              <button
+                className="absolute right-3.5 top-3.5 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-[#EAE2D6] bg-white/80 text-[#24201D] shadow-sm transition-colors hover:bg-white"
+                onClick={() => setActiveProduct(null)}
+                aria-label="Tutup detail produk"
+              >
+                <X className="h-4 w-4" strokeWidth={1.5} />
+              </button>
 
-      {activeProduct && <div className="product-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveProduct(null) }}><section className="product-dialog" role="dialog" aria-modal="true" aria-label={`Detail ${activeProduct.name}`}><button className="product-dialog-close" onClick={() => setActiveProduct(null)} aria-label="Tutup detail produk">×</button><div className="product-dialog-image">{activeProduct.imageUrl ? <Image src={activeProduct.imageUrl} alt={activeProduct.name} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-cover" /> : <div className="image-empty">{activeProduct.category}</div>}</div><div className="product-dialog-copy"><p className="eyebrow dark"><span>{activeProduct.category}</span> HEBBUNA DAILY WEAR</p>{activeProduct.label && <span className="product-dialog-label">{activeProduct.label}</span>}<h2>{activeProduct.name}</h2><p className="product-dialog-price">{money(activeProduct.price)}</p>{productDetailsLoading && <p className="product-detail-loading">Mengambil detail produk…</p>}<p className="product-dialog-description">{activeProduct.description || 'Pilihan HEBBUNA yang dibuat untuk menemani hari-harimu dengan nyaman.'}</p>{activeProduct.material && <p className="product-dialog-material"><span>Bahan</span>{activeProduct.material}</p>}<div className="product-dialog-variants"><span>Pilih warna / varian</span><div>{activeProduct.variants.map((variant, index) => <button key={variant.id} className={selectedVariant(activeProduct)?.id === variant.id ? 'selected' : ''} onClick={() => setSelectedVariants((current) => ({ ...current, [activeProduct.id]: variant.id }))} disabled={!variant.available} title={variant.available ? variant.color ?? variant.size ?? 'Varian' : 'Stok habis'}><i style={{ backgroundColor: getColorHex(variant.color ?? variant.size ?? '', index) }} />{variant.color ?? variant.size ?? `Varian ${index + 1}`}{!variant.available && <small>Habis</small>}</button>)}</div></div>{Object.entries(activeProduct.measurements ?? {}).filter(([, value]) => value.trim()).length > 0 && <dl className="product-dialog-measurements">{Object.entries(activeProduct.measurements).filter(([, value]) => value.trim()).map(([key, value]) => <div key={key}><dt>{key.replaceAll('_', ' ')}</dt><dd>{value}{measurementUnit(key)}</dd></div>)}</dl>}<p className="product-dialog-stock">{selectedVariant(activeProduct)?.available ? 'Stok tersedia · siap menemani harimu' : 'Varian ini sedang habis'}</p><div className="product-dialog-actions"><button className="primary-button dark-button buy-now-button" onClick={() => buyNow(activeProduct)} disabled={!selectedVariant(activeProduct)?.available}>Beli sekarang <span>↗</span></button><button className="add-to-cart-button" onClick={() => addToCart(activeProduct)} disabled={!selectedVariant(activeProduct)?.available}><BagIcon /><span>Masukkan ke keranjang</span></button></div><button className="product-dialog-wish" onClick={() => void toggleWishlist(activeProduct)}>{wishlistIds.includes(activeProduct.id) ? '♥ Tersimpan di wishlist' : '♡ Simpan ke wishlist'}</button>{selectedVariant(activeProduct) && !selectedVariant(activeProduct)?.available && <button className="restock-request-button" onClick={() => void requestRestock(activeProduct, selectedVariant(activeProduct)!)}>{restockIds.includes(selectedVariant(activeProduct)!.id) ? '✓ Kabar restock aktif' : 'Kabari aku saat tersedia'}</button>}</div></section></div>}
-
-      <main className="store-main">
-        {page === 'home' && <section className="editorial-hero" id="top">
-          <Image className="editorial-hero-image" src={heroImage} alt="Koleksi hijab HEBBUNA dengan gaya modest yang anggun" fill priority sizes="100vw" />
-          <div className="editorial-hero-shade" />
-          <div className="editorial-hero-copy"><p className="editorial-kicker"><span /> KOLEKSI TERBARU · HEBBUNA</p><h1>Anggun dalam<br /><em>kesederhanaan.</em></h1><p>Busana muslimah yang nyaman, dibuat untuk menemani hari-harimu dengan percaya diri.</p><a href="#koleksi" className="editorial-cta">Jelajahi koleksi <span>↗</span></a><div className="editorial-trust"><span className="trust-monogram">H.</span><span><strong>Nyaman jadi dirimu</strong><small>Gaya modest untuk hari yang nyata</small></span></div></div>
-          <div className="editorial-hero-tag">HEBBUNA <span>·</span> DAILY MODEST WEAR</div>
-          <a className="editorial-scroll" href="#koleksi"><span>Scroll untuk melihat</span><i>↓</i></a>
-          <div className="editorial-note"><span>✳</span><div><strong>Dirancang untuk keseharian</strong><small>Nyaman · Anggun · Versatile</small></div><span>↗</span></div>
-        </section>}
-
-        {page !== 'home' && <section className={`subpage-hero subpage-${page}`}><p className="eyebrow dark"><span>HEBBUNA STORE</span> {page === 'about' ? 'CERITA KAMI' : page === 'shop' ? 'BELANJA HEBBUNA' : 'PILIHAN KOLEKSI'}</p><h1>{page === 'about' ? <>Nyaman jadi<br /><em>dirimu sendiri.</em></> : page === 'shop' ? <>Temukan yang<br /><em>kamu suka.</em></> : <>Warna dan gaya<br /><em>untuk harimu.</em></>}</h1><p>{page === 'about' ? 'Tentang HEBBUNA dan cerita di balik modest wear yang menemani hari-hari nyata.' : page === 'shop' ? 'Jelajahi seluruh produk HEBBUNA, pilih warna favorit, dan temukan kenyamananmu.' : 'Rangkaian warna dan gaya yang kami pilih untuk menemani keseharianmu.'}</p></section>}
-
-        {(page === 'home' || page === 'shop' || page === 'collection') && <section className={`collection section-wrap page-${page}`} id="koleksi">
-          <div className="section-heading"><div><p className="eyebrow dark"><span>01</span> {page === 'home' ? hasBestSellerMarks ? 'BEST SELLER HEBBUNA' : 'PILIHAN HEBBUNA' : page === 'shop' ? 'BELANJA SEMUA PRODUK' : 'KOLEKSI HEBBUNA'}</p><h2>{page === 'home' ? <>Paling disukai,<br className="mobile-break" /> untuk <em>hari-harimu.</em></> : page === 'shop' ? <>Temukan gaya<br className="mobile-break" /> yang terasa <em>kamu.</em></> : <>Jelajahi pilihan<br className="mobile-break" /> yang <em>bercerita.</em></>}</h2></div><a href="/shop" className="underlined-link">{page === 'home' ? 'Lihat semua produk' : 'Belanja semua produk'} <span>↗</span></a></div>
-          <div className="collection-intro"><p>{page === 'home' ? hasBestSellerMarks ? 'Favorit pelanggan HEBBUNA.' : 'Pilihan produk HEBBUNA untuk memulai.' : page === 'shop' ? 'Seluruh koleksi tersedia dalam satu tempat.' : 'Pilih kategori yang paling dekat dengan gayamu.'}</p>{page !== 'home' && <div className="category-list" role="group" aria-label="Filter kategori produk">{categories.map((item) => <button key={item} className={category === item ? 'category-chip active' : 'category-chip'} onClick={() => setCategory(item)}>{item}</button>)}</div>}</div>
-          {searchOpen && <label className="product-search"><span>⌕</span><input autoFocus value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Cari hijab, gamis, warna…" aria-label="Cari produk" /><button onClick={() => { setSearchOpen(false); setSearchTerm('') }} aria-label="Tutup pencarian">×</button></label>}
-          {catalogState === 'error' && <p className="catalog-message error">{catalogError}</p>}
-          {catalogState === 'demo' && <p className="catalog-message">Katalog contoh · sambungkan Supabase untuk memuat produk kasir.</p>}
-          <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-12 lg:grid-cols-4" id="produk">{(page === 'home' ? bestSellerProducts : visibleProducts).map((product, index) => {
-            const variant = selectedVariant(product)
-            const colors = [...new Map(product.variants.filter((item) => item.color).map((item) => [item.color!, item])).values()]
-            return <article className="product-card-editorial" key={product.id}>
-              <div className="product-media">
-                <button className="product-image-trigger group" onClick={() => void openProduct(product)} aria-label={`Lihat detail ${product.name}`}>
-                  <span className="product-index">{String(index + 1).padStart(2, '0')}</span>
-                  {product.imageUrl ? <Image src={product.imageUrl} alt={product.name} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" className="transition-transform duration-300 ease-out group-hover:scale-105" /> : <div className="image-empty"><span>{product.category}<br />Foto menyusul</span></div>}
-                  <span className="product-view-hint">Lihat detail <i>↗</i></span>
-                </button>
-                {(product.isBestSeller || product.label) && <span className="product-editorial-label">{product.isBestSeller ? 'Best seller' : product.label}</span>}
-                <button className="product-wishlist-button" onClick={() => void toggleWishlist(product)} aria-label={wishlistIds.includes(product.id) ? `Hapus ${product.name} dari wishlist` : `Simpan ${product.name} ke wishlist`} title="Wishlist">{wishlistIds.includes(product.id) ? '♥' : '♡'}</button>
-                <button className="product-quick-add" onClick={() => addToCart(product)} disabled={!variant?.available}>{variant?.available ? 'Masukkan ke tas' : 'Stok habis'} <span>{variant?.available ? '+' : '·'}</span></button>
+              <div className="relative aspect-[3/4] w-full bg-[#EFE7DC] sm:min-h-[460px]">
+                {activeProduct.imageUrl ? (
+                  <Image src={activeProduct.imageUrl} alt={activeProduct.name} fill priority sizes="(max-width: 640px) 100vw, 50vw" className="object-cover" />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-xs text-[#736A63]">{activeProduct.category}</div>
+                )}
               </div>
-              <div className="product-editorial-meta"><div><h3>{product.name}</h3><p>{money(product.price)}</p></div><span>{variant?.color ?? variant?.size ?? 'Pilih varian'}</span></div>
-              <div className="product-editorial-swatches" aria-label={`Warna ${product.name}`}>{colors.slice(0, 6).map((item, colorIndex) => <button key={item.id} className={variant?.id === item.id ? 'selected' : ''} style={{ backgroundColor: getColorHex(item.color ?? '', colorIndex) }} aria-label={`Pilih warna ${item.color}`} title={`${item.color}${item.available ? '' : ' · habis'}`} onClick={() => setSelectedVariants((current) => ({ ...current, [product.id]: item.id }))} />)}</div>
-              {variant && !variant.available && <button className="restock-request-button" onClick={() => void requestRestock(product, variant)}>{restockIds.includes(variant.id) ? '✓ Kabar restock aktif' : '♧ Kabari aku saat tersedia'}</button>}
-              <button className="product-detail-link" onClick={() => void openProduct(product)}>Lihat detail produk <span>↗</span></button>
-            </article>
-          })}</div>
-          {catalogState === 'live' && (page === 'home' ? bestSellerProducts.length === 0 : products.length === 0) && <p className="catalog-message">Belum ada produk aktif di katalog.</p>}
-          {(page === 'shop' || page === 'collection') && canLoadMore && <div className="all-products-link"><button className="primary-button dark-button active:scale-95 transition-transform duration-300 ease-out" onClick={() => void loadMoreProducts()} disabled={loadingMore}>{loadingMore ? 'Memuat produk…' : 'Muat produk lainnya'} <span>↓</span></button></div>}
-          {page === 'home' && <div className="all-products-link"><a className="primary-button dark-button" href="/shop">Jelajahi semua produk <span>↗</span></a></div>}
-        </section>}
 
-        {page === 'home' && <section className="new-arrivals section-wrap" id="new-arrival"><div className="section-heading"><div><p className="eyebrow dark"><span>02</span> BARU DI HEBBUNA</p><h2>New <em>Arrival.</em></h2></div><a href="/shop" className="underlined-link">Jelajahi semua <span>↗</span></a></div><p className="new-arrivals-intro">Kenalan dengan pilihan warna dan gaya terbaru kami.</p><div className="new-arrival-grid">{products.slice(0, 8).map((product) => <article className="new-arrival-card group" key={`arrival-${product.id}`}><button className="new-arrival-image" onClick={() => void openProduct(product)} aria-label={`Lihat detail ${product.name}`}>{product.imageUrl ? <Image src={product.imageUrl} alt={product.name} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" className="transition-transform duration-300 ease-out group-hover:scale-105" /> : <span className="image-empty">{product.category}</span>}<span className="new-arrival-badge">NEW</span></button><div className="new-arrival-meta"><div><span>{product.category}</span><h3>{product.name}</h3></div><b>{money(product.price)}</b></div></article>)}</div></section>}
+              <div className="flex flex-col justify-between overflow-y-auto p-6 sm:p-8">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#96785D]">
+                    {activeProduct.category} · HEBBUNA WEAR
+                  </p>
 
-        {page === 'about' && <><section className="story" id="cerita"><div className="story-image"><Image src="https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1100&q=85" alt="Inspirasi gaya hijab yang nyaman dari HEBBUNA" fill sizes="(max-width: 640px) 100vw, 50vw" className="object-cover" /><span className="story-caption">HEBBUNA · NYAMAN JADI DIRIMU</span></div><div className="story-copy"><p className="eyebrow dark"><span>01</span> CERITA HEBBUNA</p><h2>Dibuat untuk<br />hari yang <em>nyata.</em></h2><p>Kami percaya gaya yang paling indah adalah gaya yang terasa nyaman. HEBBUNA memilih warna dan bahan untuk menemani langkahmu, dari pagi yang sibuk sampai waktu pulang.</p><a href="/shop" className="underlined-link">Kenali koleksi kami <span>↗</span></a><div className="story-doodle">H<span>.</span></div></div></section>
+                  <h2 className="mt-2 font-serif text-2xl font-normal text-[#24201D] sm:text-3xl">
+                    {activeProduct.name}
+                  </h2>
 
-        <section className="promise-row"><div><span className="promise-number">01</span><h3>Nyaman sepanjang hari</h3><p>Ringan dipakai dari pagi sampai sore.</p></div><div><span className="promise-number">02</span><h3>Warna mudah dipadu</h3><p>Pilihan warna yang dekat dengan gayamu.</p></div><div><span className="promise-number">03</span><h3>Dikemas oleh kami</h3><p>Pesanan disiapkan dengan teliti.</p></div></section>
+                  <p className="mt-1 text-base font-semibold text-[#96785D]">{money(activeProduct.price)}</p>
 
-        <section className="newsletter"><div className="newsletter-spark">✳</div><p className="eyebrow dark"><span>03</span> SURAT DARI HEBBUNA</p><h2>Temukan warna<br />yang terasa <em>seperti rumah.</em></h2><p>Ikuti cerita, inspirasi gaya, dan kabar koleksi terbaru kami.</p><form onSubmit={(event) => { event.preventDefault(); showNotice('Makasih, kamu sudah masuk daftar kabar HEBBUNA!') }}><label className="visually-hidden" htmlFor="email">Alamat email</label><input id="email" type="email" placeholder="Alamat email kamu" required /><button type="submit">Ikuti kabar kami <span>↗</span></button></form></section></>}
+                  {productDetailsLoading && (
+                    <p className="mt-2 text-xs text-[#736A63]">Memuat rincian bahan…</p>
+                  )}
+
+                  <p className="mt-4 text-xs leading-relaxed text-[#736A63]">
+                    {activeProduct.description || 'Pilihan busana HEBBUNA yang dirancang khusus untuk kenyamanan langkah harianmu.'}
+                  </p>
+
+                  {activeProduct.material && (
+                    <p className="mt-3 flex gap-2 text-xs text-[#4A433E]">
+                      <span className="text-[#736A63]">Material:</span>
+                      {activeProduct.material}
+                    </p>
+                  )}
+
+                  {/* Variants Selector */}
+                  <div className="mt-5">
+                    <span className="mb-2 block text-[11px] font-semibold text-[#24201D]">Pilihan Varian / Warna</span>
+                    <div className="flex flex-wrap gap-2">
+                      {activeProduct.variants.map((variant, index) => (
+                        <button
+                          key={variant.id}
+                          className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                            selectedVariant(activeProduct)?.id === variant.id
+                              ? 'border-[#96785D] bg-[#F5EDE2] font-medium text-[#24201D]'
+                              : 'border-[#EAE2D6] bg-white text-[#736A63] hover:border-[#96785D]/50 hover:text-[#24201D]'
+                          } disabled:cursor-not-allowed disabled:opacity-40`}
+                          onClick={() => setSelectedVariants((current) => ({ ...current, [activeProduct.id]: variant.id }))}
+                          disabled={!variant.available}
+                        >
+                          <span className="inline-block h-2.5 w-2.5 rounded-full border border-black/10" style={{ backgroundColor: getColorHex(variant.color ?? variant.size ?? '', index) }} />
+                          <span>{variant.color ?? variant.size ?? `Varian ${index + 1}`}</span>
+                          {!variant.available && <span className="text-[10px] text-rose-500">(Habis)</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Measurements */}
+                  {Object.entries(activeProduct.measurements ?? {}).filter(([, value]) => value.trim()).length > 0 && (
+                    <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-b border-[#EAE2D6] py-3 text-xs">
+                      {Object.entries(activeProduct.measurements).filter(([, value]) => value.trim()).map(([key, value]) => (
+                        <div key={key} className="flex justify-between gap-1">
+                          <dt className="capitalize text-[#736A63]">{key.replaceAll('_', ' ')}</dt>
+                          <dd className="font-medium text-[#24201D]">{value}{measurementUnit(key)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                </div>
+
+                <div className="mt-8">
+                  <div className="flex items-center gap-3">
+                    <motion.button
+                      whileTap={{ scale: 0.97 }}
+                      className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-[#24201D] px-5 text-xs font-semibold uppercase tracking-wider text-white shadow-sm transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-40"
+                      onClick={() => buyNow(activeProduct)}
+                      disabled={!selectedVariant(activeProduct)?.available}
+                    >
+                      <span>Beli Sekarang</span>
+                      <ArrowUpRight className="h-3.5 w-3.5 text-[#EFE7DC]" strokeWidth={1.5} />
+                    </motion.button>
+
+                    <motion.button
+                      whileTap={{ scale: 0.97 }}
+                      className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full border border-[#EAE2D6] bg-white px-5 text-xs font-semibold uppercase tracking-wider text-[#24201D] shadow-sm transition-colors hover:border-[#96785D] disabled:cursor-not-allowed disabled:opacity-40"
+                      onClick={() => addToCart(activeProduct)}
+                      disabled={!selectedVariant(activeProduct)?.available}
+                    >
+                      <ShoppingBag className="h-4 w-4 text-[#96785D]" strokeWidth={1.5} />
+                      <span>Masuk Tas</span>
+                    </motion.button>
+                  </div>
+
+                  <button
+                    className="mt-3 flex w-full items-center justify-center gap-1.5 text-xs font-medium text-[#736A63] transition-colors hover:text-[#24201D]"
+                    onClick={() => void toggleWishlist(activeProduct)}
+                  >
+                    <Heart className={`h-3.5 w-3.5 ${wishlistIds.includes(activeProduct.id) ? 'fill-[#96785D] text-[#96785D]' : ''}`} strokeWidth={1.5} />
+                    <span>{wishlistIds.includes(activeProduct.id) ? 'Tersimpan di Wishlist' : 'Simpan ke Wishlist'}</span>
+                  </button>
+
+                  {selectedVariant(activeProduct) && !selectedVariant(activeProduct)?.available && (
+                    <button
+                      className="mt-2 w-full text-center text-xs font-medium text-[#96785D] hover:underline"
+                      onClick={() => void requestRestock(activeProduct, selectedVariant(activeProduct)!)}
+                    >
+                      {restockIds.includes(selectedVariant(activeProduct)!.id) ? 'Kabar restock aktif' : 'Kabari saya saat stok tersedia'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.section>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Apple Liquid Glass Cart Drawer */}
+      <AnimatePresence>
+        {cartOpen && (
+          <>
+            <motion.div
+              className="fixed inset-0 z-[90] bg-black/20 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setCartOpen(false); setCheckoutOpen(false) }}
+            />
+            <motion.aside
+              className={`fixed bottom-0 right-0 top-0 z-[91] flex w-full max-w-md flex-col ${LIQUID_GLASS}`}
+              aria-label="Tas belanja"
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ ...liquidSpring, stiffness: 380, damping: 36 }}
+            >
+              <div className="flex items-center justify-between border-b border-[#EAE2D6] px-5 py-4">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#96785D]">HEBBUNA STORE</p>
+                  <h2 className="font-serif text-xl font-normal text-[#24201D]">
+                    {checkoutOpen ? 'Konfirmasi Pengiriman' : <>Tas Belanja <span className="font-sans text-xs text-[#736A63]">({cart.length})</span></>}
+                  </h2>
+                </div>
+                <button
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[#EAE2D6] bg-white text-[#736A63] shadow-sm transition-colors hover:text-[#24201D]"
+                  onClick={() => { setCartOpen(false); setCheckoutOpen(false) }}
+                  aria-label="Tutup tas belanja"
+                >
+                  <X className="h-4 w-4" strokeWidth={1.5} />
+                </button>
+              </div>
+
+              {checkoutOpen ? (
+                <div className="flex-1 overflow-y-auto px-5 py-4">
+                  <button className="mb-3 text-xs font-medium text-[#736A63] transition-colors hover:text-[#24201D]" onClick={() => setCheckoutOpen(false)}>
+                    ← Kembali ke rincian tas
+                  </button>
+                  <p className="mb-4 text-xs leading-relaxed text-[#736A63]">
+                    Lengkapi alamat tujuan pengiriman. Biaya ongkir akan dikonfirmasi admin sebelum transfer.
+                  </p>
+                  <form className="flex flex-col gap-4 text-xs" key={selectedAddressId} onSubmit={placeOnlineOrder}>
+                    {savedAddresses.length > 0 && (
+                      <label className="flex flex-col gap-1 font-medium text-[#24201D]">
+                        Alamat Tersimpan
+                        <select
+                          value={selectedAddressId}
+                          onChange={(e) => setSelectedAddressId(e.target.value)}
+                          className="h-10 rounded-xl border border-[#EAE2D6] bg-white px-3 text-xs text-[#24201D] outline-none"
+                        >
+                          <option value="">Gunakan Alamat Baru</option>
+                          {savedAddresses.map((a) => (
+                            <option key={a.id} value={a.id}>{a.label}{a.is_default ? ' · Utama' : ''}</option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    <label className="flex flex-col gap-1 font-medium text-[#24201D]">
+                      Nama Penerima
+                      <input name="recipient_name" autoComplete="name" defaultValue={selectedAddress?.recipient_name ?? user?.user_metadata.full_name ?? ''} required className="h-10 rounded-xl border border-[#EAE2D6] bg-white px-3 text-xs text-[#24201D] outline-none focus:border-[#96785D]" />
+                    </label>
+                    <label className="flex flex-col gap-1 font-medium text-[#24201D]">
+                      Nomor WhatsApp
+                      <input name="phone" type="tel" autoComplete="tel" defaultValue={selectedAddress?.phone ?? ''} placeholder="08xxxxxxxxxx" required className="h-10 rounded-xl border border-[#EAE2D6] bg-white px-3 text-xs text-[#24201D] outline-none focus:border-[#96785D]" />
+                    </label>
+                    <label className="flex flex-col gap-1 font-medium text-[#24201D]">
+                      Alamat Lengkap
+                      <textarea name="address_line" defaultValue={selectedAddress?.address_line ?? ''} placeholder="Nama jalan, nomor rumah, RT/RW, kecamatan" required rows={3} className="rounded-xl border border-[#EAE2D6] bg-white px-3 py-2 text-xs text-[#24201D] outline-none focus:border-[#96785D]" />
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="flex flex-col gap-1 font-medium text-[#24201D]">
+                        Kota / Kabupaten
+                        <input name="city" defaultValue={selectedAddress?.city ?? ''} required className="h-10 rounded-xl border border-[#EAE2D6] bg-white px-3 text-xs text-[#24201D] outline-none focus:border-[#96785D]" />
+                      </label>
+                      <label className="flex flex-col gap-1 font-medium text-[#24201D]">
+                        Provinsi
+                        <input name="province" defaultValue={selectedAddress?.province ?? ''} required className="h-10 rounded-xl border border-[#EAE2D6] bg-white px-3 text-xs text-[#24201D] outline-none focus:border-[#96785D]" />
+                      </label>
+                    </div>
+                    <label className="flex flex-col gap-1 font-medium text-[#24201D]">
+                      Kode Pos
+                      <input name="postal_code" defaultValue={selectedAddress?.postal_code ?? ''} required className="h-10 rounded-xl border border-[#EAE2D6] bg-white px-3 text-xs text-[#24201D] outline-none focus:border-[#96785D]" />
+                    </label>
+                    <label className="flex flex-col gap-1 font-medium text-[#24201D]">
+                      Catatan Pengiriman (Opsional)
+                      <textarea name="delivery_note" defaultValue={selectedAddress?.delivery_note ?? ''} placeholder="Patokan atau pesan kurir" rows={2} className="rounded-xl border border-[#EAE2D6] bg-white px-3 py-2 text-xs text-[#24201D] outline-none focus:border-[#96785D]" />
+                    </label>
+                    {!selectedAddress && (
+                      <label className="flex items-center gap-2 text-xs text-[#736A63]">
+                        <input type="checkbox" name="save_address" className="accent-[#96785D]" />
+                        Simpan alamat ini untuk pesanan berikutnya
+                      </label>
+                    )}
+                    <div className="mt-2 flex items-center justify-between border-t border-[#EAE2D6] pt-3 text-xs">
+                      <span className="text-[#736A63]">Subtotal Produk</span>
+                      <strong className="text-sm font-semibold text-[#24201D]">{money(subtotal)}</strong>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-[#736A63]">
+                      Metode pembayaran transfer manual. Admin kami akan mengirimkan rincian rekening setelah pesanan terdaftar.
+                    </p>
+                    <motion.button
+                      whileTap={{ scale: 0.97 }}
+                      className="mt-2 flex h-11 items-center justify-center gap-2 rounded-full bg-[#24201D] text-xs font-semibold uppercase tracking-wider text-white shadow-sm transition-colors hover:bg-black disabled:opacity-50"
+                      type="submit"
+                      disabled={submittingOrder}
+                    >
+                      {submittingOrder ? 'Memproses Pesanan…' : 'Konfirmasi Pesanan'}
+                      <ArrowUpRight className="h-3.5 w-3.5 text-[#EFE7DC]" strokeWidth={1.5} />
+                    </motion.button>
+                  </form>
+                </div>
+              ) : cart.length === 0 ? (
+                <div className="flex flex-1 flex-col items-center justify-center gap-3 px-5 text-center">
+                  <ShoppingBag className="h-8 w-8 text-[#96785D]/40" strokeWidth={1.5} />
+                  <p className="text-xs text-[#736A63]">Tas belanja kamu masih kosong.</p>
+                  <button className="text-xs font-semibold text-[#96785D] hover:underline" onClick={() => setCartOpen(false)}>
+                    Jelajahi koleksi busana kami
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex-1 overflow-y-auto px-5 py-3">
+                    {cart.map((item, index) => (
+                      <div className="flex gap-3 border-b border-[#EAE2D6] py-3.5" key={`${item.product.id}-${item.variant.id}-${index}`}>
+                        <div className="relative h-16 w-12 overflow-hidden rounded-lg bg-[#EFE7DC] shrink-0">
+                          {item.product.imageUrl ? (
+                            <Image src={item.product.imageUrl} alt="" fill sizes="48px" className="object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-[10px] text-[#736A63]">H.</div>
+                          )}
+                        </div>
+                        <div className="flex flex-1 flex-col justify-center">
+                          <h3 className="truncate font-sans text-xs font-semibold text-[#24201D]">{item.product.name}</h3>
+                          <p className="text-[11px] text-[#736A63]">{item.variant.color}{item.variant.size ? ` · ${item.variant.size}` : ''}</p>
+                          <div className="mt-1 flex items-center justify-between">
+                            <span className="text-xs font-semibold text-[#96785D]">{money(item.product.price)}</span>
+                            <button className="text-[11px] text-rose-500 hover:underline" onClick={() => removeFromCart(index)}>
+                              Hapus
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="border-t border-[#EAE2D6] px-5 py-4">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[#736A63]">Total Sementara</span>
+                      <strong className="text-sm font-semibold text-[#24201D]">{money(subtotal)}</strong>
+                    </div>
+                    <p className="mt-1 text-[11px] text-[#736A63]">Ongkos kirim dikonfirmasi sebelum transfer manual.</p>
+                    <motion.button
+                      whileTap={{ scale: 0.97 }}
+                      className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#24201D] text-xs font-semibold uppercase tracking-wider text-white shadow-sm transition-colors hover:bg-black"
+                      onClick={beginCheckout}
+                    >
+                      <span>Lanjut ke Pengiriman</span>
+                      <ArrowUpRight className="h-3.5 w-3.5 text-[#EFE7DC]" strokeWidth={1.5} />
+                    </motion.button>
+                  </div>
+                </>
+              )}
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Main Page Content */}
+      <main className="relative min-h-screen bg-[#FCFBF8] text-[#24201D]">
+        {/* Editorial Hero (Homepage Only) */}
+        {page === 'home' && (
+          <section className="relative flex min-h-[92svh] w-full flex-col justify-center overflow-hidden px-5 pt-28 pb-16 sm:px-8 sm:pt-36 sm:pb-24 lg:px-16" id="top">
+            {/* Ambient Warm Champagne Glow */}
+            <div aria-hidden="true" className="pointer-events-none absolute -top-40 right-10 h-[500px] w-[500px] rounded-full bg-[#F5EDE2]/80 blur-[140px]" />
+            <div aria-hidden="true" className="pointer-events-none absolute bottom-10 left-10 h-[400px] w-[400px] rounded-full bg-[#EFE7DC]/50 blur-[120px]" />
+
+            <div className="relative z-10 mx-auto w-full max-w-7xl">
+              <div className="grid items-center gap-12 lg:grid-cols-12">
+                {/* Left Editorial Copy */}
+                <div className="lg:col-span-7">
+                  <motion.p
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...liquidSpring, delay: 0.1 }}
+                    className="flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-[#96785D]"
+                  >
+                    <span className="h-px w-6 bg-[#96785D]" />
+                    MODEST WEAR · KOLEKSI TERBARU
+                  </motion.p>
+
+                  <motion.h1
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...liquidSpring, delay: 0.2 }}
+                    className="mt-6 font-serif text-[clamp(44px,7vw,92px)] font-normal leading-[1.02] tracking-[-0.02em] text-[#24201D]"
+                  >
+                    Anggun dalam<br />
+                    <span className="italic text-[#96785D]">kesederhanaan.</span>
+                  </motion.h1>
+
+                  <motion.p
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...liquidSpring, delay: 0.3 }}
+                    className="mt-6 max-w-md text-xs leading-relaxed text-[#736A63] sm:text-sm"
+                  >
+                    Busana muslimah kontemporer dengan siluet luwes, dirancang untuk menemani hari-harimu dengan penuh percaya diri dan rasa nyaman.
+                  </motion.p>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...liquidSpring, delay: 0.4 }}
+                    className="mt-8 flex flex-wrap items-center gap-4"
+                  >
+                    <a
+                      href="#koleksi"
+                      className="inline-flex h-12 items-center gap-2.5 rounded-full bg-[#24201D] px-7 text-xs font-semibold uppercase tracking-wider text-white shadow-sm transition-all hover:bg-black active:scale-95"
+                    >
+                      <span>Jelajahi Koleksi</span>
+                      <ArrowUpRight className="h-3.5 w-3.5 text-[#EFE7DC]" strokeWidth={1.5} />
+                    </a>
+
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#EAE2D6] bg-white/70 px-4 py-2 text-xs text-[#736A63] shadow-sm">
+                      <Sparkles className="h-3.5 w-3.5 text-[#96785D]" strokeWidth={1.5} />
+                      <span>Kenyamanan Esensial Setiap Hari</span>
+                    </div>
+                  </motion.div>
+                </div>
+
+                {/* Right Hero Image Card */}
+                <div className="lg:col-span-5">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ ...liquidSpring, delay: 0.3 }}
+                    className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-[#EFE7DC] shadow-[0_20px_40px_rgba(120,100,80,0.06)]"
+                  >
+                    <Image
+                      src={heroImage}
+                      alt="Koleksi hijab HEBBUNA dengan gaya modest yang anggun"
+                      fill
+                      priority
+                      sizes="(max-width: 1024px) 100vw, 50vw"
+                      className="object-cover object-[center_30%]"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+                    <span className="absolute bottom-4 left-4 rounded-full border border-white/60 bg-white/70 px-3.5 py-1 text-[10px] font-medium tracking-wider text-[#24201D] backdrop-blur-md">
+                      HEBBUNA ESSENTIALS
+                    </span>
+                  </motion.div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Subpage Header (For /shop, /collection, /about) */}
+        {page !== 'home' && (
+          <section className="relative overflow-hidden border-b border-[#EAE2D6] px-5 pt-32 pb-14 sm:px-8 sm:pt-36 sm:pb-18 lg:px-16">
+            <div aria-hidden="true" className="pointer-events-none absolute -top-32 right-10 h-72 w-72 rounded-full bg-[#F5EDE2] blur-[100px]" />
+            <div className="relative mx-auto max-w-7xl">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#96785D]">
+                HEBBUNA STORE · {page === 'about' ? 'CERITA KAMI' : page === 'shop' ? 'KATALOG PRODUK' : 'PILIHAN KOLEKSI'}
+              </p>
+              <h1 className="mt-3 font-serif text-3xl font-normal leading-tight text-[#24201D] sm:text-5xl">
+                {page === 'about' ? (
+                  <>Nyaman jadi <span className="italic text-[#96785D]">dirimu sendiri.</span></>
+                ) : page === 'shop' ? (
+                  <>Temukan siluet yang <span className="italic text-[#96785D]">kamu sukai.</span></>
+                ) : (
+                  <>Warna dan gaya <span className="italic text-[#96785D]">untuk harimu.</span></>
+                )}
+              </h1>
+              <p className="mt-3 max-w-lg text-xs leading-relaxed text-[#736A63] sm:text-sm">
+                {page === 'about'
+                  ? 'Cerita di balik kurasi modest wear HEBBUNA yang menemani langkah-langkah nyata.'
+                  : page === 'shop'
+                  ? 'Katalog lengkap pilihan hijab dan pakaian modest dengan material terpilih.'
+                  : 'Rangkaian nuansa lembut yang kami pilih untuk menemani keseharianmu.'}
+              </p>
+            </div>
+          </section>
+        )}
+
+        {/* Clean Product Catalog (Anti-Template: NO BOXES/CARDS, clean 3:4 standing on background) */}
+        {(page === 'home' || page === 'shop' || page === 'collection') && (
+          <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24" id="koleksi">
+            {/* Header */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between border-b border-[#EAE2D6] pb-5">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#96785D]">
+                  01 · {page === 'home' ? (hasBestSellerMarks ? 'PRODUK TERPOPULER' : 'PILIHAN HEBBUNA') : 'SELURUH KOLEKSI'}
+                </p>
+                <h2 className="mt-2 font-serif text-2xl font-normal text-[#24201D] sm:text-4xl">
+                  {page === 'home' ? (
+                    <>Paling disukai untuk <span className="italic text-[#96785D]">hari-harimu.</span></>
+                  ) : (
+                    <>Koleksi Busana <span className="italic text-[#96785D]">Kontemporer.</span></>
+                  )}
+                </h2>
+              </div>
+              <Link href="/shop" className="group inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#96785D] hover:text-[#24201D] transition-colors">
+                <span>{page === 'home' ? 'Semua Produk' : 'Katalog Penuh'}</span>
+                <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" strokeWidth={1.5} />
+              </Link>
+            </div>
+
+            {/* Filter Bar & Search */}
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter kategori">
+                {categories.map((item) => (
+                  <button
+                    key={item}
+                    className={`rounded-full px-3.5 py-1 text-xs transition-all ${
+                      category === item
+                        ? 'border border-[#96785D] bg-[#F5EDE2] font-semibold text-[#24201D]'
+                        : 'border border-[#EAE2D6] bg-white text-[#736A63] hover:border-[#96785D]/50 hover:text-[#24201D]'
+                    }`}
+                    onClick={() => setCategory(item)}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+
+              {/* Debounced Search */}
+              <div className="relative flex items-center">
+                <Search className="absolute left-3 h-3.5 w-3.5 text-[#736A63]" strokeWidth={1.5} />
+                <input
+                  id="catalog-search-input"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="Cari hijab, bahan, warna…"
+                  className="h-8 w-full rounded-full border border-[#EAE2D6] bg-white pl-8 pr-3 text-xs text-[#24201D] placeholder-[#736A63]/60 outline-none focus:border-[#96785D] sm:w-56"
+                />
+                {searchInput && (
+                  <button onClick={() => setSearchInput('')} className="absolute right-2.5 text-[#736A63] hover:text-[#24201D]">
+                    <X className="h-3 w-3" strokeWidth={1.5} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {catalogState === 'error' && (
+              <p className="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700">{catalogError}</p>
+            )}
+
+            {/* Clean Anti-Template Product Grid */}
+            <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 sm:gap-y-12 lg:grid-cols-4" id="produk">
+              {(page === 'home' ? bestSellerProducts : visibleProducts).map((product, index) => {
+                const variant = selectedVariant(product)
+                const colors = [...new Map(product.variants.filter((item) => item.color).map((item) => [item.color!, item])).values()]
+
+                return (
+                  <article key={product.id} className="group relative flex flex-col">
+                    {/* 3:4 Clean Image Frame (Rounded-xl, zero card box, directly standing on #FCFBF8) */}
+                    <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-[#EFE7DC]">
+                      <button
+                        onClick={() => void openProduct(product)}
+                        className="h-full w-full cursor-pointer overflow-hidden border-0 p-0 text-left"
+                        aria-label={`Lihat detail ${product.name}`}
+                      >
+                        <ProductImage src={product.imageUrl} alt={product.name} priority={index < 4 && page === 'home'} />
+                      </button>
+
+                      {/* Wishlist Button floating cleanly */}
+                      <button
+                        onClick={() => void toggleWishlist(product)}
+                        className="absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-white/90 bg-white/80 text-[#4A433E] shadow-sm backdrop-blur-md transition-transform active:scale-90 hover:bg-white"
+                        aria-label={wishlistIds.includes(product.id) ? `Hapus ${product.name} dari wishlist` : `Simpan ${product.name} ke wishlist`}
+                      >
+                        <Heart className={`h-4 w-4 ${wishlistIds.includes(product.id) ? 'fill-[#96785D] text-[#96785D]' : ''}`} strokeWidth={1.5} />
+                      </button>
+
+                      {/* Quick Add floating on bottom */}
+                      <button
+                        onClick={() => addToCart(product)}
+                        disabled={!variant?.available}
+                        className="absolute bottom-2.5 inset-x-2.5 flex h-9 items-center justify-center gap-1.5 rounded-lg border border-white/90 bg-white/85 text-xs font-medium text-[#24201D] shadow-sm backdrop-blur-md transition-all hover:bg-white active:scale-95 disabled:opacity-40"
+                      >
+                        <ShoppingBag className="h-3.5 w-3.5 text-[#96785D]" strokeWidth={1.5} />
+                        <span>{variant?.available ? 'Tambah ke Tas' : 'Habis'}</span>
+                      </button>
+
+                      {product.label && (
+                        <span className="absolute left-2.5 top-2.5 rounded-md border border-white/80 bg-white/85 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#96785D] backdrop-blur-md">
+                          {product.label}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Left Aligned Text (Plus Jakarta Sans) */}
+                    <div className="mt-3 flex flex-col items-start gap-1">
+                      <button
+                        onClick={() => void openProduct(product)}
+                        className="text-left font-sans text-xs sm:text-sm font-medium text-[#24201D] transition-colors hover:text-[#96785D] truncate w-full"
+                      >
+                        {product.name}
+                      </button>
+
+                      <div className="flex w-full items-center justify-between">
+                        <span className="font-sans text-xs font-semibold text-[#96785D]">
+                          {money(product.price)}
+                        </span>
+
+                        {/* Swatches */}
+                        {colors.length > 0 && (
+                          <div className="flex items-center gap-1">
+                            {colors.slice(0, 4).map((c, cIdx) => (
+                              <button
+                                key={c.id}
+                                className={`h-2.5 w-2.5 rounded-full border transition-transform ${
+                                  variant?.id === c.id ? 'scale-125 border-[#24201D]' : 'border-black/10'
+                                }`}
+                                style={{ backgroundColor: getColorHex(c.color ?? '', cIdx) }}
+                                aria-label={`Pilih warna ${c.color}`}
+                                onClick={() => setSelectedVariants((cur) => ({ ...cur, [product.id]: c.id }))}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+
+            {visibleProducts.length === 0 && (
+              <p className="mt-12 text-center text-xs text-[#736A63]">Tidak ada produk yang cocok dengan pencarian.</p>
+            )}
+
+            {(page === 'shop' || page === 'collection') && canLoadMore && (
+              <div className="mt-14 flex justify-center">
+                <button
+                  className="rounded-full border border-[#EAE2D6] bg-white px-7 py-2.5 text-xs font-semibold uppercase tracking-wider text-[#24201D] shadow-sm transition-all hover:border-[#96785D] active:scale-95"
+                  onClick={() => void loadMoreProducts()}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? 'Memuat Produk…' : 'Muat Lebih Banyak'}
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* New Arrivals Section on Home */}
+        {page === 'home' && (
+          <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24 border-t border-[#EAE2D6]" id="new-arrival">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between border-b border-[#EAE2D6] pb-5">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#96785D]">
+                  02 · TERBARU BULAN INI
+                </p>
+                <h2 className="mt-2 font-serif text-2xl font-normal text-[#24201D] sm:text-4xl">
+                  New <span className="italic text-[#96785D]">Arrivals.</span>
+                </h2>
+              </div>
+              <Link href="/shop" className="group inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#96785D] hover:text-[#24201D] transition-colors">
+                <span>Lihat Semua</span>
+                <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" strokeWidth={1.5} />
+              </Link>
+            </div>
+
+            <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 sm:gap-y-10 lg:grid-cols-4">
+              {products.slice(0, 4).map((product) => (
+                <article key={`arrival-${product.id}`} className="group relative flex flex-col">
+                  <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-[#EFE7DC]">
+                    <button
+                      onClick={() => void openProduct(product)}
+                      className="h-full w-full cursor-pointer overflow-hidden border-0 p-0 text-left"
+                      aria-label={`Lihat detail ${product.name}`}
+                    >
+                      <ProductImage src={product.imageUrl} alt={product.name} />
+                    </button>
+                    <span className="absolute left-2.5 top-2.5 rounded-md border border-white/80 bg-white/85 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#96785D] backdrop-blur-md">
+                      NEW
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex flex-col items-start gap-1">
+                    <button
+                      onClick={() => void openProduct(product)}
+                      className="text-left font-sans text-xs sm:text-sm font-medium text-[#24201D] transition-colors hover:text-[#96785D] truncate w-full"
+                    >
+                      {product.name}
+                    </button>
+                    <span className="font-sans text-xs font-semibold text-[#96785D]">{money(product.price)}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Story Section for /about */}
+        {page === 'about' && (
+          <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24">
+            <section className="grid overflow-hidden rounded-2xl border border-[#EAE2D6] bg-white lg:grid-cols-2" id="cerita">
+              <div className="relative min-h-[360px] lg:min-h-[480px]">
+                <Image
+                  src="https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1100&q=85"
+                  alt="Inspirasi gaya hijab HEBBUNA"
+                  fill
+                  sizes="(max-width: 640px) 100vw, 50vw"
+                  className="object-cover"
+                />
+              </div>
+              <div className="flex flex-col justify-center p-8 sm:p-12 lg:p-16">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#96785D]">
+                  CERITA HEBBUNA
+                </p>
+                <h2 className="mt-3 font-serif text-3xl font-normal leading-tight text-[#24201D] sm:text-4xl">
+                  Dibuat untuk hari-hari yang <span className="italic text-[#96785D]">nyata.</span>
+                </h2>
+                <p className="mt-4 text-xs leading-relaxed text-[#736A63] sm:text-sm">
+                  Kami percaya bahwa keanggunan sejati bermula dari kenyamanan. HEBBUNA mengkurasi material bertekstur lembut dan palet warna bumi yang hangat untuk melengkapi ritme aktivitasmu dari pagi hingga petang.
+                </p>
+                <div className="mt-6">
+                  <Link href="/shop" className="group inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#96785D] hover:text-[#24201D] transition-colors">
+                    <span>Mulai Menjelajah</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" strokeWidth={1.5} />
+                  </Link>
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
       </main>
-      <div className={cartOpen ? 'drawer-overlay open' : 'drawer-overlay'} onClick={() => { setCartOpen(false); setCheckoutOpen(false) }} />
-      <aside className={cartOpen ? 'cart-drawer open' : 'cart-drawer'} aria-label="Tas belanja" aria-hidden={!cartOpen}>
-        <div className="drawer-heading"><div><p className="eyebrow dark">HEBBUNA STORE</p><h2>{checkoutOpen ? 'Alamat kirim' : <>Tas belanja <span>({cart.length})</span></>}</h2></div><button className="close-drawer" onClick={() => { setCartOpen(false); setCheckoutOpen(false) }} aria-label="Tutup tas belanja">×</button></div>
-        {checkoutOpen ? <div className="checkout-view">
-          <button className="back-to-cart" onClick={() => setCheckoutOpen(false)}>← Kembali ke tas</button>
-          <p className="checkout-intro">Isi alamat tujuan. Kami konfirmasi ongkir sebelum kamu transfer.</p>
-          <form className="checkout-form" key={selectedAddressId} onSubmit={placeOnlineOrder}>
-            {savedAddresses.length > 0 && <label>Alamat tersimpan<select value={selectedAddressId} onChange={(event) => setSelectedAddressId(event.target.value)}><option value="">Isi alamat baru</option>{savedAddresses.map((address) => <option key={address.id} value={address.id}>{address.label}{address.is_default ? ' · Utama' : ''}</option>)}</select></label>}
-            <label>Nama penerima<input name="recipient_name" autoComplete="name" defaultValue={selectedAddress?.recipient_name ?? user?.user_metadata.full_name ?? ''} required maxLength={120} /></label>
-            <label>Nomor WhatsApp<input name="phone" type="tel" autoComplete="tel" defaultValue={selectedAddress?.phone ?? ''} placeholder="08xxxxxxxxxx" required maxLength={30} /></label>
-            <label>Alamat lengkap<textarea name="address_line" autoComplete="street-address" defaultValue={selectedAddress?.address_line ?? ''} placeholder="Nama jalan, nomor rumah, RT/RW, kecamatan" required maxLength={500} rows={3} /></label>
-            <div className="address-pair"><label>Kota / kabupaten<input name="city" autoComplete="address-level2" defaultValue={selectedAddress?.city ?? ''} required maxLength={100} /></label><label>Provinsi<input name="province" autoComplete="address-level1" defaultValue={selectedAddress?.province ?? ''} required maxLength={100} /></label></div>
-            <label>Kode pos<input name="postal_code" inputMode="numeric" autoComplete="postal-code" defaultValue={selectedAddress?.postal_code ?? ''} required maxLength={10} /></label>
-            <label>Catatan kurir <span>(opsional)</span><textarea name="delivery_note" defaultValue={selectedAddress?.delivery_note ?? ''} placeholder="Patokan rumah atau pesan untuk kurir" maxLength={300} rows={2} /></label>
-            {!selectedAddress && <label className="save-address-option"><input type="checkbox" name="save_address" /> Simpan alamat ini untuk checkout berikutnya</label>}
-            <div className="checkout-total"><span>Subtotal produk</span><b>{money(subtotal)}</b></div>
-            <p className="transfer-note">Pembayaran transfer manual. Ongkir dikonfirmasi setelah pesanan masuk, sebelum pembayaran.</p>
-            <button className="primary-button dark-button checkout-submit" type="submit" disabled={submittingOrder}>{submittingOrder ? 'Menyimpan pesanan…' : 'Buat pesanan'} <span>↗</span></button>
-          </form>
-        </div> : cart.length === 0 ? <div className="empty-cart"><span>♡</span><p>Tasmu masih kosong.</p><button onClick={() => setCartOpen(false)}>Yuk, cari rona favoritmu</button></div> : <><div className="cart-items">{cart.map((item, index) => <div className="cart-item" key={`${item.product.id}-${item.variant.id}-${index}`}>{item.product.imageUrl ? <Image src={item.product.imageUrl} alt="" width={60} height={72} sizes="60px" /> : <div className="cart-item-empty"/>}<div><h3>{item.product.name}</h3><p>{item.variant.color}{item.variant.size ? ` · ${item.variant.size}` : ''}</p><b>{money(item.product.price)}</b><button onClick={() => removeFromCart(index)}>Hapus</button></div></div>)}</div><div className="cart-summary"><div><span>Subtotal</span><b>{money(subtotal)}</b></div><p>Ongkir dikonfirmasi sebelum transfer manual.</p><button className="primary-button dark-button" onClick={beginCheckout}>Lanjut ke checkout <span>↗</span></button></div></>}
-      </aside>
-      {notice && <div className="toast" role="status">{notice}</div>}
+
+      {/* Floating Notice / Toast with Apple Liquid Glass */}
+      <AnimatePresence>
+        {notice && (
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.95 }}
+            transition={liquidSpring}
+            className={`fixed bottom-6 left-1/2 z-[200] -translate-x-1/2 rounded-full px-5 py-2.5 text-xs font-medium text-[#24201D] ${LIQUID_GLASS}`}
+            role="status"
+          >
+            {notice}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   )
 }
-
-export default App
