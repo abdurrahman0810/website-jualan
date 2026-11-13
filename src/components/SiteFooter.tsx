@@ -10,21 +10,11 @@ const EXPLORE_LINKS = [
 const CUSTOMER_LINKS = [
   { label: 'Akun & Pesanan', href: '/akun' },
   { label: 'Panduan Belanja', href: '/shop' },
-  { label: 'Hubungi WhatsApp', href: 'https://wa.me/6281234567890' },
+  { label: 'Hubungi WhatsApp', href: 'https://wa.me/6281284094614' },
 ]
 
 const SOCIAL_LINKS = [
-  {
-    name: 'TikTok',
-    href: 'https://www.tiktok.com/',
-    label: 'TikTok HEBBUNA',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-3.5 w-3.5" aria-hidden="true">
-        <path d="M14 3v11.2a4.2 4.2 0 1 1-3.5-4.1" />
-        <path d="M14 3c.5 3.1 2.3 4.8 5.3 5.2" />
-      </svg>
-    ),
-  },
+  
   {
     name: 'Instagram',
     href: 'https://www.instagram.com/',
